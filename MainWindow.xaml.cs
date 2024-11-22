@@ -34,7 +34,7 @@ namespace CameraExample
             Closing += MainWindow_Closing;
             _videoSource = VideoSourceUtils.GetVideoDevice(new CameraSettings
             {
-                CameraId = 0,
+                CameraId = 1,
                 ResolutionId = 0,
                 CameraControlPropertySettings = new List<CameraControlPropertySettings>
                 { 
