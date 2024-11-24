@@ -48,7 +48,7 @@ namespace CameraExample
                     new CameraControlPropertySettings
                     {
                         CameraControlProperty = "Exposure", // Pan, Tilt, Roll, Zoom, Exposure, Iris, Focus
-                        Value = -1, // only int value
+                        Value = 0, // only int value
                         CameraControlFlag = "Manual" // Manual, Auto, None
                     }
                 },
@@ -67,82 +67,128 @@ namespace CameraExample
 
             // Передаем _cameraSettings в VideoSource
             _videoSource = VideoSourceUtils.GetVideoDevice(_cameraSettings);
-            
-            /*
-            _videoSource = VideoSourceUtils.GetVideoDevice(new CameraSettings
-            {
-                CameraId = 1,
-                ResolutionId = 0,
-                CameraControlPropertySettings = new List<CameraControlPropertySettings>
-                { 
-                    new CameraControlPropertySettings
-                    {
-                        CameraControlProperty = "Exposure", // Pan, Tilt, Roll, Zoom, Exposure, Iris, Focus
-                        Value = 0, // only int value
-                        CameraControlFlag = "Manual" // Manual, Auto, None
-                    }
-                },
-                CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings> 
-                { 
-                    new CameraProcAmpPropertySettings
-                    {
-                        VideoProcAmpProperty = "Brightness", // Brightness, Contrast, Hue, Saturation, Sharpness, Gamma, ColorEnable, WhiteBalance, BacklightCompensation, 
-                        // Gain, DigitalMultiplier, DigitalMultiplierLimit, WhiteBalanceComponent, PowerlineFrequency
-                        Value = 64, // only int value
-                        VideoProcAmpFlag = "Manual" // Manual, Auto, None
-                    }
-                }
-            });
-            */
 
-            if (_videoSource != null )
+            if (_videoSource != null)
             {
                 _videoSource.NewFrame += OnNewFrame;
                 _videoSource.Start();
                 Console.WriteLine("Video source has been successfully started");
             }
 
-            // Запускаем обновление Brightness после инициализации
-            _ = UpdateBrightnessAsync();
+            // Запускаем обновление Exposure после инициализации
+            _ = UpdateExposureBasedOnColorAsync();
         }
 
-        // Асинхронный метод для изменения Brightness
-        private async Task UpdateBrightnessAsync()
+        private async Task UpdateExposureBasedOnColorAsync()
         {
-            if (_cameraSettings?.CameraProcAmpPropertySettings == null) return;
+            if (_cameraSettings?.CameraControlPropertySettings == null) return;
 
-            int value = 0;
-
-            // Цикл изменения Brightness от 5 до 60
-            while (value <= 60)
+            while (true)
             {
+                // Извлекаем кадр и анализируем цвета
+                Bitmap frame = Frame;
+                if (frame == null) continue;
+
+                // Преобразуем кадр в изображение для анализа
+                var colorData = AnalyzeFrameColors(frame);
+
+                // Определяем среднюю яркость для каждого цвета
+                int averageRedBrightness = colorData.RedBrightness;
+                int averageGreenBrightness = colorData.GreenBrightness;
+                int averageBlueBrightness = colorData.BlueBrightness;
+
+                // Логика регулировки экспозиции на основе анализа
+                int targetExposure = CalculateTargetExposure(averageRedBrightness, averageGreenBrightness, averageBlueBrightness);
+
+                //Console.WriteLine($"CalculateTargetExposure: {targetExposure}");
+
                 lock (_locker)
                 {
-                    // Ищем настройку Brightness и обновляем её значение
-                    foreach (var setting in _cameraSettings.CameraProcAmpPropertySettings)
+                    // Обновляем экспозицию
+                    foreach (var setting in _cameraSettings.CameraControlPropertySettings)
                     {
-                        if (setting.VideoProcAmpProperty == "Brightness")
+                        if (setting.CameraControlProperty == "Exposure")
                         {
-                            setting.Value = value;
-                            Console.WriteLine($"Brightness updated to: {value}");
+                            setting.Value = targetExposure;
 
-                            // Приводим _videoSource к типу VideoCaptureDevice и применяем изменения
+                            // Применяем изменения экспозиции
                             if (_videoSource is VideoCaptureDevice videoDevice)
                             {
-                                videoDevice.SetVideoProcAmpProperty(
-                                    (VideoProcAmpProperty)Enum.Parse(typeof(VideoProcAmpProperty), setting.VideoProcAmpProperty),
+                                videoDevice.SetCameraProperty(
+                                    (CameraControlProperty)Enum.Parse(typeof(CameraControlProperty), setting.CameraControlProperty),
                                     setting.Value,
-                                    (VideoProcAmpFlags)Enum.Parse(typeof(VideoProcAmpFlags), setting.VideoProcAmpFlag));
+                                    (CameraControlFlags)Enum.Parse(typeof(CameraControlFlags), setting.CameraControlFlag));
                             }
-
                             break;
                         }
                     }
                 }
 
-                value += 5; // Увеличиваем значение на 5
-                await Task.Delay(1000); // Задержка 1 секунда
+                // Задержка между обновлениями (например, 1 секунда)
+                await Task.Delay(1000);
             }
+        }
+
+        private int currentExposure = -4; // Начальное значение экспозиции
+        private readonly int targetBrightnessMin = 30; // Минимальная целевая яркость int targetBrightnessMin = 100
+        private readonly int targetBrightnessMax = 90; // Максимальная целевая яркость int targetBrightnessMax = 150
+
+
+        private int CalculateTargetExposure(int redBrightness, int greenBrightness, int blueBrightness)
+        {
+            // Рассчитываем среднюю яркость
+            int averageBrightness = (redBrightness + greenBrightness + blueBrightness) / 3;
+
+            Console.WriteLine($"AverageBrightness: {averageBrightness}");
+
+            // Проверяем, находится ли яркость в целевом диапазоне
+            if (averageBrightness < targetBrightnessMin)
+            {
+                // Если яркость ниже целевого диапазона, увеличиваем экспозицию
+                currentExposure = Math.Min(currentExposure + 1, 0); // Ограничение сверху (максимум 0)
+            }
+            else if (averageBrightness > targetBrightnessMax)
+            {
+                // Если яркость выше целевого диапазона, уменьшаем экспозицию
+                currentExposure = Math.Max(currentExposure - 1, -8); // Ограничение снизу (минимум -8)
+            }
+
+            Console.WriteLine($"TargetExposure: {currentExposure}");
+
+            return currentExposure;
+        }
+
+        // Функция для анализа кадра и выставления оптимальной экспозиции
+        public int AnalyzeAndAdjustExposure(Bitmap frame)
+        {
+            var (redBrightness, greenBrightness, blueBrightness) = AnalyzeFrameColors(frame);
+            return CalculateTargetExposure(redBrightness, greenBrightness, blueBrightness);
+        }
+
+        // Анализ цветов в кадре (из вашего примера)
+        private (int RedBrightness, int GreenBrightness, int BlueBrightness) AnalyzeFrameColors(Bitmap frame)
+        {
+            int redSum = 0, greenSum = 0, blueSum = 0, pixelCount = 0;
+
+            for (int y = 0; y < frame.Height; y++)
+            {
+                for (int x = 0; x < frame.Width; x++)
+                {
+                    Color pixelColor = frame.GetPixel(x, y);
+
+                    redSum += pixelColor.R;
+                    greenSum += pixelColor.G;
+                    blueSum += pixelColor.B;
+
+                    pixelCount++;
+                }
+            }
+
+            int redBrightness = redSum / pixelCount;
+            int greenBrightness = greenSum / pixelCount;
+            int blueBrightness = blueSum / pixelCount;
+
+            return (redBrightness, greenBrightness, blueBrightness);
         }
 
         // Закрытие окна и освобождение ресурсов
@@ -268,3 +314,4 @@ namespace CameraExample
         #endregion
     }
 }
+
