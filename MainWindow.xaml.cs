@@ -131,8 +131,8 @@ namespace CameraExample
 
         private int currentExposure = -4; // Начальное значение экспозиции
         private readonly int targetBrightnessMin = 30; // Минимальная целевая яркость int targetBrightnessMin = 100
-        private readonly int targetBrightnessMax = 90; // Максимальная целевая яркость int targetBrightnessMax = 150
-
+        //private readonly int targetBrightnessMax = 90; // Максимальная целевая яркость int targetBrightnessMax = 150
+        private readonly int targetBrightnessMax = 80;
 
         private int CalculateTargetExposure(int redBrightness, int greenBrightness, int blueBrightness)
         {
@@ -158,12 +158,6 @@ namespace CameraExample
             return currentExposure;
         }
 
-        // Функция для анализа кадра и выставления оптимальной экспозиции
-        public int AnalyzeAndAdjustExposure(Bitmap frame)
-        {
-            var (redBrightness, greenBrightness, blueBrightness) = AnalyzeFrameColors(frame);
-            return CalculateTargetExposure(redBrightness, greenBrightness, blueBrightness);
-        }
 
         // Анализ цветов в кадре (из вашего примера)
         private (int RedBrightness, int GreenBrightness, int BlueBrightness) AnalyzeFrameColors(Bitmap frame)
