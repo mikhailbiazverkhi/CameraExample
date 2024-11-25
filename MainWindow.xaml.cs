@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using UMapx.Imaging;
 using UMapx.Video;
 using UMapx.Video.DirectShow;
 
@@ -158,32 +159,64 @@ namespace CameraExample
             return currentExposure;
         }
 
-
-        // Анализ цветов в кадре (из вашего примера)
+        // Анализ цветов в кадре
         private (int RedBrightness, int GreenBrightness, int BlueBrightness) AnalyzeFrameColors(Bitmap frame)
         {
-            int redSum = 0, greenSum = 0, blueSum = 0, pixelCount = 0;
+            // Используем метод ToRGB для получения массива плоскостей RGB
+            float[][,] rgbArray = BitmapMatrix.ToRGB(frame); // [R, G, B], массив двумерных массивов
 
-            for (int y = 0; y < frame.Height; y++)
+            int width = rgbArray[0].GetLength(0);  // Ширина
+            int height = rgbArray[0].GetLength(1); // Высота
+
+            float redSum = 0, greenSum = 0, blueSum = 0;
+            int pixelCount = width * height;
+
+            // Проходим по пикселям и суммируем RGB-компоненты
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < frame.Width; x++)
+                for (int x = 0; x < width; x++)
                 {
-                    Color pixelColor = frame.GetPixel(x, y);
-
-                    redSum += pixelColor.R;
-                    greenSum += pixelColor.G;
-                    blueSum += pixelColor.B;
-
-                    pixelCount++;
+                    redSum += rgbArray[0][x, y];   // R-компонента
+                    greenSum += rgbArray[1][x, y]; // G-компонента
+                    blueSum += rgbArray[2][x, y];  // B-компонента
                 }
             }
 
-            int redBrightness = redSum / pixelCount;
-            int greenBrightness = greenSum / pixelCount;
-            int blueBrightness = blueSum / pixelCount;
+            // Рассчитываем среднюю яркость
+            int redBrightness = (int)(redSum / pixelCount * 255);
+            int greenBrightness = (int)(greenSum / pixelCount * 255);
+            int blueBrightness = (int)(blueSum / pixelCount * 255);
 
             return (redBrightness, greenBrightness, blueBrightness);
         }
+
+        // Анализ цветов в кадре (из вашего примера)
+        //private (int RedBrightness, int GreenBrightness, int BlueBrightness) AnalyzeFrameColors(Bitmap frame)
+        //{
+        //    int redSum = 0, greenSum = 0, blueSum = 0, pixelCount = 0;
+
+        //    for (int y = 0; y < frame.Height; y++)
+        //    {
+        //        for (int x = 0; x < frame.Width; x++)
+        //        {
+        //            Color pixelColor = frame.GetPixel(x, y);
+
+        //            redSum += pixelColor.R;
+        //            greenSum += pixelColor.G;
+        //            blueSum += pixelColor.B;
+
+        //            pixelCount++;
+        //        }
+        //    }
+
+        //    int redBrightness = redSum / pixelCount;
+        //    int greenBrightness = greenSum / pixelCount;
+        //    int blueBrightness = blueSum / pixelCount;
+
+        //    return (redBrightness, greenBrightness, blueBrightness);
+        //}
+
+
 
         // Закрытие окна и освобождение ресурсов
 
