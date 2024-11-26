@@ -10,6 +10,7 @@ using System.Windows.Threading;
 using UMapx.Imaging;
 using UMapx.Video;
 using UMapx.Video.DirectShow;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace CameraExample
 {
@@ -78,6 +79,38 @@ namespace CameraExample
 
             // Запускаем обновление Exposure после инициализации
             _ = UpdateExposureBasedOnColorAsync();
+            _ = UpdateVideoProcAmpParametersBasedOnFrameAsync();
+        }
+
+        // Анализ цветов в кадре
+        private (int RedBrightness, int GreenBrightness, int BlueBrightness) AnalyzeFrameColors(Bitmap frame)
+        {
+            // Используем метод ToRGB для получения массива плоскостей RGB
+            float[][,] rgbArray = BitmapMatrix.ToRGB(frame); // [R, G, B], массив двумерных массивов
+
+            int width = rgbArray[0].GetLength(0);  // Ширина
+            int height = rgbArray[0].GetLength(1); // Высота
+
+            float redSum = 0, greenSum = 0, blueSum = 0;
+            int pixelCount = width * height;
+
+            // Проходим по пикселям и суммируем RGB-компоненты
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    redSum += rgbArray[0][x, y];   // R-компонента
+                    greenSum += rgbArray[1][x, y]; // G-компонента
+                    blueSum += rgbArray[2][x, y];  // B-компонента
+                }
+            }
+
+            // Рассчитываем среднюю яркость
+            int redBrightness = (int)(redSum / pixelCount * 255);
+            int greenBrightness = (int)(greenSum / pixelCount * 255);
+            int blueBrightness = (int)(blueSum / pixelCount * 255);
+
+            return (redBrightness, greenBrightness, blueBrightness);
         }
 
         private async Task UpdateExposureBasedOnColorAsync()
@@ -100,8 +133,6 @@ namespace CameraExample
 
                 // Логика регулировки экспозиции на основе анализа
                 int targetExposure = CalculateTargetExposure(averageRedBrightness, averageGreenBrightness, averageBlueBrightness);
-
-                //Console.WriteLine($"CalculateTargetExposure: {targetExposure}");
 
                 lock (_locker)
                 {
@@ -140,7 +171,7 @@ namespace CameraExample
             // Рассчитываем среднюю яркость
             int averageBrightness = (redBrightness + greenBrightness + blueBrightness) / 3;
 
-            Console.WriteLine($"AverageBrightness: {averageBrightness}");
+            //Console.WriteLine($"AverageBrightness111: {averageBrightness}");
 
             // Проверяем, находится ли яркость в целевом диапазоне
             if (averageBrightness < targetBrightnessMin)
@@ -159,63 +190,94 @@ namespace CameraExample
             return currentExposure;
         }
 
-        // Анализ цветов в кадре
-        private (int RedBrightness, int GreenBrightness, int BlueBrightness) AnalyzeFrameColors(Bitmap frame)
+        private async Task UpdateVideoProcAmpParametersBasedOnFrameAsync()
         {
-            // Используем метод ToRGB для получения массива плоскостей RGB
-            float[][,] rgbArray = BitmapMatrix.ToRGB(frame); // [R, G, B], массив двумерных массивов
+            if (_cameraSettings?.CameraProcAmpPropertySettings == null) return;
 
-            int width = rgbArray[0].GetLength(0);  // Ширина
-            int height = rgbArray[0].GetLength(1); // Высота
-
-            float redSum = 0, greenSum = 0, blueSum = 0;
-            int pixelCount = width * height;
-
-            // Проходим по пикселям и суммируем RGB-компоненты
-            for (int y = 0; y < height; y++)
+            while (true)
             {
-                for (int x = 0; x < width; x++)
+                // Извлекаем текущий кадр
+                Bitmap frame = Frame;
+                if (frame == null) continue;
+
+                // Анализируем цвета кадра
+                var colorData = AnalyzeFrameColors(frame);
+
+                // Определяем среднюю яркость кадра
+                int averageBrightness = (colorData.RedBrightness + colorData.GreenBrightness + colorData.BlueBrightness) / 3;
+
+                //Console.WriteLine($"Average Brightness222: {averageBrightness}");
+
+                lock (_locker)
                 {
-                    redSum += rgbArray[0][x, y];   // R-компонента
-                    greenSum += rgbArray[1][x, y]; // G-компонента
-                    blueSum += rgbArray[2][x, y];  // B-компонента
+                    foreach (var setting in _cameraSettings.CameraProcAmpPropertySettings)
+                    {
+                        // Применяем логическую регулировку параметров
+                        switch (setting.VideoProcAmpProperty)
+                        {
+                            // Регулируем яркость
+                            case "Brightness":
+                                ////setting.Value = ClampValue(averageBrightness / 2, 0, 255); // Регулируем яркость
+                                ////setting.Value = ClampValue(averageBrightness / 2, -64, 64);
+                                ////setting.Value = 64;
+                                // Проверяем, находится ли яркость в целевом диапазоне
+                                if (averageBrightness < targetBrightnessMin)
+                                {
+                                    // Если яркость ниже целевого диапазона, увеличиваем яркость
+                                    setting.Value = Math.Min(setting.Value + 10, 64); // Ограничение сверху (максимум 0)
+                                }
+                                else if (averageBrightness > targetBrightnessMax)
+                                {
+                                    // Если яркость выше целевого диапазона, уменьшаем яркость
+                                    setting.Value = Math.Max(setting.Value - 10, -64); // Ограничение снизу (минимум -8)
+                                }
+                                Console.WriteLine($"SettingBrightness: {setting.Value}");
+                                break;
+                            case "Contrast":
+                                setting.Value = ClampValue(averageBrightness / 3, 0, 255); // Регулируем контраст
+                                break;
+                            case "Hue":
+                                setting.Value = ClampValue((averageBrightness % 360), -180, 180); // Регулируем оттенок
+                                break;
+                            case "Saturation":
+                                setting.Value = ClampValue(averageBrightness / 4, 0, 255); // Регулируем насыщенность
+                                break;
+                            case "Sharpness":
+                                setting.Value = ClampValue(averageBrightness / 5, 0, 255); // Регулируем резкость
+                                break;
+                            case "Gamma":
+                                setting.Value = ClampValue(averageBrightness / 2, 1, 500); // Регулируем гамму
+                                break;
+                            case "WhiteBalance":
+                                setting.Value = ClampValue(averageBrightness * 50, 2000, 10000); // Регулируем баланс белого
+                                break;
+                            case "Gain":
+                                setting.Value = ClampValue(averageBrightness * 2, 0, 255); // Регулируем усиление
+                                break;
+                        }
+
+                        // Применяем изменения к видеоустройству
+                        if (_videoSource is VideoCaptureDevice videoDevice)
+                        {
+                            //videoDevice.SetVideoProperty(
+                            videoDevice.SetVideoProcAmpProperty(
+                                (VideoProcAmpProperty)Enum.Parse(typeof(VideoProcAmpProperty), setting.VideoProcAmpProperty),
+                                setting.Value,
+                                (VideoProcAmpFlags)Enum.Parse(typeof(VideoProcAmpFlags), setting.VideoProcAmpFlag));
+                        }
+                    }
                 }
+
+                // Задержка между обновлениями (например, 1 секунда)
+                await Task.Delay(1000);
             }
-
-            // Рассчитываем среднюю яркость
-            int redBrightness = (int)(redSum / pixelCount * 255);
-            int greenBrightness = (int)(greenSum / pixelCount * 255);
-            int blueBrightness = (int)(blueSum / pixelCount * 255);
-
-            return (redBrightness, greenBrightness, blueBrightness);
         }
 
-        // Анализ цветов в кадре (из вашего примера)
-        //private (int RedBrightness, int GreenBrightness, int BlueBrightness) AnalyzeFrameColors(Bitmap frame)
-        //{
-        //    int redSum = 0, greenSum = 0, blueSum = 0, pixelCount = 0;
-
-        //    for (int y = 0; y < frame.Height; y++)
-        //    {
-        //        for (int x = 0; x < frame.Width; x++)
-        //        {
-        //            Color pixelColor = frame.GetPixel(x, y);
-
-        //            redSum += pixelColor.R;
-        //            greenSum += pixelColor.G;
-        //            blueSum += pixelColor.B;
-
-        //            pixelCount++;
-        //        }
-        //    }
-
-        //    int redBrightness = redSum / pixelCount;
-        //    int greenBrightness = greenSum / pixelCount;
-        //    int blueBrightness = blueSum / pixelCount;
-
-        //    return (redBrightness, greenBrightness, blueBrightness);
-        //}
-
+        // Вспомогательный метод для ограничения значения в диапазоне
+        private int ClampValue(int value, int min, int max)
+        {
+            return Math.Max(min, Math.Min(max, value));
+        }
 
 
         // Закрытие окна и освобождение ресурсов
