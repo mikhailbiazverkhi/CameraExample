@@ -74,9 +74,8 @@ namespace CameraExample
                 Console.WriteLine("Video source has been successfully started");
             }
 
-            // Запускаем обновление Exposure после инициализации
-            _ = UpdateExposureBasedOnColorAsync();
-            _ = UpdateVideoProcAmpParametersBasedOnFrameAsync();
+            // Запускаем обновление Exposure и Brightness после инициализации
+            _ = UpdateCameraSettingsBasedOnFrameAsync();
         }
 
         #endregion
@@ -161,62 +160,13 @@ namespace CameraExample
             }
         }
 
-        private async Task UpdateExposureBasedOnColorAsync()
+
+        private async Task UpdateCameraSettingsBasedOnFrameAsync()
         {
-            if (_cameraSettings?.CameraControlPropertySettings == null) return;
+            if (_cameraSettings == null) return;
 
             while (true)
             {
-                // Извлекаем кадр и анализируем цвета
-                using var frame = Frame;
-
-                if (frame == null) continue;
-
-                // Преобразуем кадр в изображение для анализа
-                var colorData = AnalyzeFrameColors(frame);
-
-                // Определяем среднюю яркость для каждого цвета
-                int averageRedBrightness = colorData.RedBrightness;
-                int averageGreenBrightness = colorData.GreenBrightness;
-                int averageBlueBrightness = colorData.BlueBrightness;
-
-                // Логика регулировки экспозиции на основе анализа
-                int targetExposure = CalculateTargetExposure(averageRedBrightness, averageGreenBrightness, averageBlueBrightness);
-
-                lock (_locker)
-                {
-                    // Обновляем экспозицию
-                    foreach (var setting in _cameraSettings.CameraControlPropertySettings)
-                    {
-                        if (setting.CameraControlProperty == "Exposure")
-                        {
-                            setting.Value = targetExposure;
-
-                            // Применяем изменения экспозиции
-                            if (_videoSource is VideoCaptureDevice videoDevice)
-                            {
-                                videoDevice.SetCameraProperty(
-                                    (CameraControlProperty)Enum.Parse(typeof(CameraControlProperty), setting.CameraControlProperty),
-                                    setting.Value,
-                                    (CameraControlFlags)Enum.Parse(typeof(CameraControlFlags), setting.CameraControlFlag));
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                // Задержка между обновлениями (например, 1 секунда)
-                await Task.Delay(1000);
-            }
-        }
-
-        private async Task UpdateVideoProcAmpParametersBasedOnFrameAsync()
-        {
-            if (_cameraSettings?.CameraProcAmpPropertySettings == null) return;
-
-            while (true)
-            {
-                // Извлекаем текущий кадр
                 using var frame = Frame;
 
                 if (frame == null) continue;
@@ -224,72 +174,83 @@ namespace CameraExample
                 // Анализируем цвета кадра
                 var colorData = AnalyzeFrameColors(frame);
 
-                // Определяем среднюю яркость кадра
-                int averageBrightness = (colorData.RedBrightness + colorData.GreenBrightness + colorData.BlueBrightness) / 3;
-
-                //Console.WriteLine($"Average Brightness222: {averageBrightness}");
+                int averageRedBrightness = colorData.RedBrightness;
+                int averageGreenBrightness = colorData.GreenBrightness;
+                int averageBlueBrightness = colorData.BlueBrightness;
+                int averageBrightness = (averageRedBrightness + averageGreenBrightness + averageBlueBrightness) / 3;
 
                 lock (_locker)
                 {
-                    foreach (var setting in _cameraSettings.CameraProcAmpPropertySettings)
+                    // Регулируем CameraControl экспозицию (Exposure)
+                    if (_cameraSettings.CameraControlPropertySettings != null)
                     {
-                        // Применяем логическую регулировку параметров
-                        switch (setting.VideoProcAmpProperty)
+                        foreach (var setting in _cameraSettings.CameraControlPropertySettings)
                         {
-                            // Регулируем яркость
-                            case "Brightness":
-                                ////setting.Value = ClampValue(averageBrightness / 2, 0, 255); // Регулируем яркость
-                                ////setting.Value = ClampValue(averageBrightness / 2, -64, 64);
-                                ////setting.Value = 64;
-                                // Проверяем, находится ли яркость в целевом диапазоне
-                                if (averageBrightness < targetBrightnessMin)
-                                {
-                                    // Если яркость ниже целевого диапазона, увеличиваем яркость
-                                    setting.Value = Math.Min(setting.Value + 10, 64); // Ограничение сверху (максимум 0)
-                                }
-                                else if (averageBrightness > targetBrightnessMax)
-                                {
-                                    // Если яркость выше целевого диапазона, уменьшаем яркость
-                                    setting.Value = Math.Max(setting.Value - 10, -64); // Ограничение снизу (минимум -8)
-                                }
-                                Console.WriteLine($"SettingBrightness: {setting.Value}");
-                                break;
-                            case "Contrast":
-                                setting.Value = ClampValue(averageBrightness / 3, 0, 255); // Регулируем контраст
-                                break;
-                            case "Hue":
-                                setting.Value = ClampValue(averageBrightness % 360, -180, 180); // Регулируем оттенок
-                                break;
-                            case "Saturation":
-                                setting.Value = ClampValue(averageBrightness / 4, 0, 255); // Регулируем насыщенность
-                                break;
-                            case "Sharpness":
-                                setting.Value = ClampValue(averageBrightness / 5, 0, 255); // Регулируем резкость
-                                break;
-                            case "Gamma":
-                                setting.Value = ClampValue(averageBrightness / 2, 1, 500); // Регулируем гамму
-                                break;
-                            case "WhiteBalance":
-                                setting.Value = ClampValue(averageBrightness * 50, 2000, 10000); // Регулируем баланс белого
-                                break;
-                            case "Gain":
-                                setting.Value = ClampValue(averageBrightness * 2, 0, 255); // Регулируем усиление
-                                break;
-                        }
+                            if (setting.CameraControlProperty == "Exposure")
+                            {
+                                int targetExposure = CalculateTargetExposure(averageRedBrightness, averageGreenBrightness, averageBlueBrightness);
+                                setting.Value = targetExposure;
 
-                        // Применяем изменения к видеоустройству
-                        if (_videoSource is VideoCaptureDevice videoDevice)
+                                if (_videoSource is VideoCaptureDevice videoDevice)
+                                {
+                                    videoDevice.SetCameraProperty(
+                                        (CameraControlProperty)Enum.Parse(typeof(CameraControlProperty), setting.CameraControlProperty),
+                                        setting.Value,
+                                        (CameraControlFlags)Enum.Parse(typeof(CameraControlFlags), setting.CameraControlFlag));
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    // Регулируем параметры VideoProcAmp яркость (Brightness)
+                    if (_cameraSettings.CameraProcAmpPropertySettings != null)
+                    {
+                        foreach (var setting in _cameraSettings.CameraProcAmpPropertySettings)
                         {
-                            //videoDevice.SetVideoProperty(
-                            videoDevice.SetVideoProcAmpProperty(
-                                (VideoProcAmpProperty)Enum.Parse(typeof(VideoProcAmpProperty), setting.VideoProcAmpProperty),
-                                setting.Value,
-                                (VideoProcAmpFlags)Enum.Parse(typeof(VideoProcAmpFlags), setting.VideoProcAmpFlag));
+                            switch (setting.VideoProcAmpProperty)
+                            {
+                                case "Brightness":
+                                    if (averageBrightness < targetBrightnessMin)
+                                        setting.Value = Math.Min(setting.Value + 10, 64);
+                                    else if (averageBrightness > targetBrightnessMax)
+                                        setting.Value = Math.Max(setting.Value - 10, -64);
+                                    break;
+                                case "Contrast":
+                                    setting.Value = ClampValue(averageBrightness / 3, 0, 255);
+                                    break;
+                                case "Hue":
+                                    setting.Value = ClampValue(averageBrightness % 360, -180, 180);
+                                    break;
+                                case "Saturation":
+                                    setting.Value = ClampValue(averageBrightness / 4, 0, 255);
+                                    break;
+                                case "Sharpness":
+                                    setting.Value = ClampValue(averageBrightness / 5, 0, 255);
+                                    break;
+                                case "Gamma":
+                                    setting.Value = ClampValue(averageBrightness / 2, 1, 500);
+                                    break;
+                                case "WhiteBalance":
+                                    setting.Value = ClampValue(averageBrightness * 50, 2000, 10000);
+                                    break;
+                                case "Gain":
+                                    setting.Value = ClampValue(averageBrightness * 2, 0, 255);
+                                    break;
+                            }
+
+                            if (_videoSource is VideoCaptureDevice videoDevice)
+                            {
+                                videoDevice.SetVideoProcAmpProperty(
+                                    (VideoProcAmpProperty)Enum.Parse(typeof(VideoProcAmpProperty), setting.VideoProcAmpProperty),
+                                    setting.Value,
+                                    (VideoProcAmpFlags)Enum.Parse(typeof(VideoProcAmpFlags), setting.VideoProcAmpFlag));
+                            }
                         }
                     }
                 }
 
-                // Задержка между обновлениями (например, 1 секунда)
+                // Задержка между обновлениями
                 await Task.Delay(1000);
             }
         }
