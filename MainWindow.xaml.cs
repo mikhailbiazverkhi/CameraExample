@@ -160,7 +160,6 @@ namespace CameraExample
             }
         }
 
-
         private async Task UpdateCameraSettingsBasedOnFrameAsync()
         {
             if (_cameraSettings == null) return;
@@ -172,11 +171,7 @@ namespace CameraExample
                 if (frame == null) continue;
 
                 // Анализируем цвета кадра
-                var colorData = AnalyzeFrameColors(frame);
-
-                int averageRedBrightness = colorData.RedBrightness;
-                int averageGreenBrightness = colorData.GreenBrightness;
-                int averageBlueBrightness = colorData.BlueBrightness;
+                var (averageRedBrightness, averageGreenBrightness, averageBlueBrightness) = AnalyzeFrameColors(frame);
                 int averageBrightness = (averageRedBrightness + averageGreenBrightness + averageBlueBrightness) / 3;
 
                 lock (_locker)
