@@ -22,8 +22,14 @@ namespace CameraExample
 
         private readonly IVideoSource _videoSource;
         private static readonly object _locker = new();
-        private readonly CameraSettings _cameraSettings;
+        private CameraSettings _cameraSettings;
         private Bitmap _frame;
+
+        private int _currentExposure = -4; // Начальное значение экспозиции
+        private int _currentBrightness = 0; // Переменная для хранения текущей яркости
+        private const int TargetBrightnessMin = 30; // Минимальная целевая яркость int targetBrightnessMin = 100
+        private const int TargetBrightnessMax = 80; // Максимальная целевая яркость int targetBrightnessMax = 150
+        private int _currentContrast = 50; // Начальное значение контраста
 
         #endregion
 
@@ -37,34 +43,7 @@ namespace CameraExample
             InitializeComponent();
             Closing += MainWindow_Closing;
 
-            // Инициализируем _cameraSettings с настройками камеры
-            _cameraSettings = new CameraSettings
-            {
-                CameraId = 1,
-                ResolutionId = 0,
-                CameraControlPropertySettings = new List<CameraControlPropertySettings>
-                {
-                    new CameraControlPropertySettings
-                    {
-                        CameraControlProperty = "Exposure", // Pan, Tilt, Roll, Zoom, Exposure, Iris, Focus
-                        Value = 0, // only int value
-                        CameraControlFlag = "Manual" // Manual, Auto, None
-                    }
-                },
-                CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings>
-                {
-                    new CameraProcAmpPropertySettings
-                    {
-                        VideoProcAmpProperty = "Brightness", 
-                        // Brightness, Contrast, Hue, Saturation, Sharpness, Gamma, ColorEnable, WhiteBalance, BacklightCompensation, 
-                        // Gain, DigitalMultiplier, DigitalMultiplierLimit, WhiteBalanceComponent, PowerlineFrequency
-                        Value = 0, // Начальное значение и  only int value
-                        VideoProcAmpFlag = "Manual" // Manual, Auto, None
-                    }
-                }
-            };
-
-            // Передаем _cameraSettings в VideoSource
+            InitializeCameraSettings();
             _videoSource = VideoSourceUtils.GetVideoDevice(_cameraSettings);
 
             if (_videoSource != null)
@@ -74,48 +53,297 @@ namespace CameraExample
                 Console.WriteLine("Video source has been successfully started");
             }
 
-            // Запускаем обновление Exposure и Brightness после инициализации
-            _ = UpdateCameraSettingsBasedOnFrameAsync();
+            _ = UpdateCameraSettingsAsync();
+        }
+           
+            #endregion
+
+        #region Camera Settings
+
+            private void InitializeCameraSettings()
+            {
+                _cameraSettings = new CameraSettings
+                {
+                    CameraId = 1,
+                    ResolutionId = 0,
+                    CameraControlPropertySettings = new List<CameraControlPropertySettings>
+                {
+                    new CameraControlPropertySettings
+                    {
+                        CameraControlProperty = "Exposure",
+                        Value = 0,
+                        CameraControlFlag = "Auto"
+                    }
+                },
+                    CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings>
+                {
+                    new CameraProcAmpPropertySettings
+                    {
+                        VideoProcAmpProperty = "Brightness",
+                        Value = 0,
+                        VideoProcAmpFlag = "Auto"
+                    },
+                    new CameraProcAmpPropertySettings
+                    {
+                        VideoProcAmpProperty = "Hue",
+                        Value = 0,
+                        VideoProcAmpFlag = "Auto"
+                    }
+                    ,
+                    new CameraProcAmpPropertySettings
+                    {
+                        VideoProcAmpProperty = "Contrast",
+                        Value = 65,
+                        VideoProcAmpFlag = "Auto"
+                    }
+                }
+                };
+            }
+        private async Task UpdateCameraSettingsAsync()
+        {
+            while (true)
+            {
+                using var frame = Frame;
+                if (frame == null) continue;
+
+                var (averageRed, averageGreen, averageBlue, _, _, _) = AnalyzeFrameColors(frame);
+                int averageBrightness = (averageRed + averageGreen + averageBlue) / 3;
+
+                lock (_locker)
+                {
+                    UpdateExposure(averageBrightness);
+                    UpdateBrightness(averageBrightness);
+
+                    // Обновление Hue
+                    int hueAdjustment = CalculateHueAdjustment(averageRed, averageGreen, averageBlue);
+                    SetProcAmpProperty("Hue", hueAdjustment);
+
+                    // Обновление Contrast
+                    int contrastAdjustment = CalculateContrastAdjustment(averageRed, averageGreen, averageBlue, _currentContrast);
+                    if (contrastAdjustment != _currentContrast)
+                    {
+                        _currentContrast = contrastAdjustment;
+                        SetProcAmpProperty("Contrast", contrastAdjustment);
+                    }
+                }
+
+                await Task.Delay(1000);
+            }
+        }
+
+        private void UpdateExposure(int averageBrightness)
+        {
+            if (averageBrightness < TargetBrightnessMin)
+                _currentExposure = Math.Min(_currentExposure + 1, 0);
+            else if (averageBrightness > TargetBrightnessMax)
+                _currentExposure = Math.Max(_currentExposure - 1, -8);
+
+            SetCameraProperty("Exposure", _currentExposure);
+        }
+
+        private void UpdateBrightness(int averageBrightness)
+        {
+            if (averageBrightness < TargetBrightnessMin)
+            {
+                _currentBrightness = Math.Clamp(_currentBrightness + 10, -64, 64);
+            }
+            else if (averageBrightness > TargetBrightnessMax)
+            {
+                _currentBrightness = Math.Clamp(_currentBrightness - 10, -64, 64);
+            }
+
+            SetProcAmpProperty("Brightness", _currentBrightness);
+        }
+
+        private void SetCameraProperty(string property, int value)
+        {
+            if (_videoSource is VideoCaptureDevice videoDevice)
+            {
+                videoDevice.SetCameraProperty(
+                    (CameraControlProperty)Enum.Parse(typeof(CameraControlProperty), property),
+                    value,
+                    CameraControlFlags.Manual);
+            }
+        }
+
+        private void SetProcAmpProperty(string property, int value)
+        {
+            if (_videoSource is VideoCaptureDevice videoDevice)
+            {
+                videoDevice.SetVideoProcAmpProperty(
+                    (VideoProcAmpProperty)Enum.Parse(typeof(VideoProcAmpProperty), property),
+                    value,
+                    VideoProcAmpFlags.Manual);
+            }
+        }
+
+        #endregion
+
+        #region Frame Analysis
+
+        private (int Red, int Green, int Blue, int RedMarker, int GreenMarker, int BlueMarker) AnalyzeFrameColors(Bitmap frame)
+        {
+            var (averageRed, averageGreen, averageBlue) = AnalyzeAverageColors(frame);
+            var (redMarker, greenMarker, blueMarker) = AnalyzeMarkers(frame);
+
+            return (averageRed, averageGreen, averageBlue, redMarker, greenMarker, blueMarker);
+        }
+
+        private (int Red, int Green, int Blue) AnalyzeAverageColors(Bitmap frame)
+        {
+            int pixelCount = frame.Width * frame.Height;
+            long redSum = 0, greenSum = 0, blueSum = 0;
+
+            for (int y = 0; y < frame.Height; y++)
+            {
+                for (int x = 0; x < frame.Width; x++)
+                {
+                    var pixel = frame.GetPixel(x, y);  //
+                    redSum += pixel.R;
+                    greenSum += pixel.G;
+                    blueSum += pixel.B;
+                }
+            }
+
+            return ((int)(redSum / pixelCount), (int)(greenSum / pixelCount), (int)(blueSum / pixelCount));
+        }
+
+        //!!!!! BitmapMatrix.ToRGB(frame)
+
+        //private (int Red, int Green, int Blue) AnalyzeAverageColors(Bitmap frame)
+        //{
+        //    // Используем BitmapMatrix.ToRGB для получения данных RGB
+        //    var rgbMatrix = BitmapMatrix.ToRGB(frame);
+        //    int height = rgbMatrix.GetLength(0);
+        //    int width = rgbMatrix.GetLength(1);
+
+        //    float redSum = 0, greenSum = 0, blueSum = 0;
+
+        //    for (int y = 0; y < height; y++)
+        //    {
+        //        for (int x = 0; x < width; x++)
+        //        {
+        //            redSum += rgbMatrix[0][x, y];
+        //            greenSum += rgbMatrix[1][x, y];
+        //            blueSum += rgbMatrix[2][x, y];
+        //        }
+        //    }
+
+        //    int pixelCount = width * height;
+        //    return ((int)(redSum / pixelCount), (int)(greenSum / pixelCount), (int)(blueSum / pixelCount));
+        //}
+
+        private (int RedMarker, int GreenMarker, int BlueMarker) AnalyzeMarkers(Bitmap frame)
+        {
+            return (
+                GetAverageBrightness(frame, new System.Drawing.Point(50, 50), 20),
+                GetAverageBrightness(frame, new System.Drawing.Point(frame.Width - 50, 50), 20),
+                GetAverageBrightness(frame, new System.Drawing.Point(frame.Width / 2, frame.Height - 50), 20)
+            );
+        }
+
+        private int GetAverageBrightness(Bitmap frame, System.Drawing.Point position, int size)
+        {
+            int totalBrightness = 0, pixelCount = 0;
+
+            for (int y = position.Y - size / 2; y < position.Y + size / 2; y++)
+            {
+                for (int x = position.X - size / 2; x < position.X + size / 2; x++)
+                {
+                    if (x >= 0 && x < frame.Width && y >= 0 && y < frame.Height)
+                    {
+                        var pixel = frame.GetPixel(x, y);  //
+                        totalBrightness += (int)(0.2126 * pixel.R + 0.7152 * pixel.G + 0.0722 * pixel.B);
+                        pixelCount++;
+                    }
+                }
+            }
+
+            return pixelCount > 0 ? totalBrightness / pixelCount : 0;
+        }
+
+        //!!!!! BitmapMatrix.ToRGB(frame)
+
+        //private int GetAverageBrightness(Bitmap frame, System.Drawing.Point position, int size)
+        //{
+        //    // Используем BitmapMatrix.ToRGB для получения данных RGB
+        //    var rgbMatrix = BitmapMatrix.ToRGB(frame);
+        //    int height = rgbMatrix.GetLength(0);
+        //    int width = rgbMatrix.GetLength(1);
+
+        //    int totalBrightness = 0, pixelCount = 0;
+
+        //    for (int y = position.Y - size / 2; y < position.Y + size / 2; y++)
+        //    {
+        //        for (int x = position.X - size / 2; x < position.X + size / 2; x++)
+        //        {
+        //            if (x >= 0 && x < width && y >= 0 && y < height)
+        //            {
+        //                int brightness = (int)(0.2126 * rgbMatrix[0][y, x] + 0.7152 * rgbMatrix[1][y, x] + 0.0722 * rgbMatrix[2][y, x]);
+        //                totalBrightness += brightness;
+        //                pixelCount++;
+        //            }
+        //        }
+        //    }
+
+        //    return pixelCount > 0 ? totalBrightness / pixelCount : 0;
+        //}
+
+
+        private int CalculateHueAdjustment(int redMarker, int greenMarker, int blueMarker)
+        {
+            // Идеальные значения цветов маркеров
+            const int IdealRed = 255;
+            const int IdealGreen = 255;
+            const int IdealBlue = 255;
+
+            // Расчет среднего отклонения цветов
+            int redDelta = Math.Abs(IdealRed - redMarker);
+            int greenDelta = Math.Abs(IdealGreen - greenMarker);
+            int blueDelta = Math.Abs(IdealBlue - blueMarker);
+
+            // Определение общей корректировки оттенка (эмпирическое значение)
+            int hueAdjustment = (redDelta - greenDelta + blueDelta) / 3;
+
+            // Возврат ограниченной корректировки
+            return Math.Clamp(hueAdjustment, -30, 30); // Диапазон корректировки Hue
+        }
+
+        private int CalculateContrastAdjustment(int averageRed, int averageGreen, int averageBlue, int currentContrast)
+        {
+            // Рассчитать разброс яркости
+            int minColor = Math.Min(averageRed, Math.Min(averageGreen, averageBlue));
+            int maxColor = Math.Max(averageRed, Math.Max(averageGreen, averageBlue));
+            int brightnessRange = maxColor - minColor;
+
+            // Определить идеальный контраст для текущего разброса
+            int idealContrast = brightnessRange < 50 ? 80 : (brightnessRange > 150 ? 50 : 65);
+
+            // Плавно скорректировать контраст к целевому значению
+            int newContrast = currentContrast + (idealContrast - currentContrast) / 4;
+
+            // Ограничить диапазон контраста
+            return Math.Clamp(newContrast, 0, 100);
         }
 
         #endregion
 
         #region Properties
-
-        /// <summary>
-        /// Get frame and dispose previous.
-        /// </summary>
         private Bitmap Frame
         {
             get
             {
-                if (_frame is null)
-                    return null;
-
-                Bitmap frame;
-
-                lock (_locker)
-                {
-                    frame = (Bitmap)_frame.Clone();
-                }
-
-                return frame;
+                lock (_locker) return _frame?.Clone() as Bitmap;
             }
             set
             {
                 lock (_locker)
                 {
-                    if (_frame != null)
-                    {
-                        _frame.Dispose();
-                        _frame = null;
-                    }
-
+                    _frame?.Dispose();
                     _frame = value;
                 }
             }
         }
-
         #endregion
 
         #region Handling events
@@ -127,8 +355,31 @@ namespace CameraExample
         /// <param name="eventArgs">event arguments</param>
         private void OnNewFrame(object sender, NewFrameEventArgs eventArgs)
         {
-            Frame = (Bitmap)eventArgs.Frame.Clone();
-            InvokeDrawing();
+            Bitmap frame = (Bitmap)eventArgs.Frame.Clone();
+            Frame = AddColorMarkers(frame);
+            UpdateImage();
+        }
+
+        private Bitmap AddColorMarkers(Bitmap frame)
+        {
+            using Graphics g = Graphics.FromImage(frame);
+            int markerSize = 20;
+
+            g.FillEllipse(Brushes.Red, 40, 40, markerSize, markerSize);
+            g.FillEllipse(Brushes.Green, frame.Width - 60, 40, markerSize, markerSize);
+            g.FillEllipse(Brushes.Blue, frame.Width / 2 - 10, frame.Height - 60, markerSize, markerSize);
+
+            return frame;
+        }
+
+        private void UpdateImage()
+        {
+            if (Frame != null)
+            {
+                var bitmapSource = Frame.ToBitmapSource();
+                bitmapSource.Freeze();
+                Dispatcher.BeginInvoke(() => imgColor.Source = bitmapSource);
+            }
         }
 
         /// <summary>
@@ -139,217 +390,17 @@ namespace CameraExample
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             _videoSource?.SignalToStop();
-            _videoSource?.Dispose();
-            _frame?.Dispose();
-            Console.WriteLine("Video source has been successfully stopped");
+            _videoSource?.WaitForStop();
+            Dispose();
         }
-
-        /// <summary>
-        /// Invoke drawing method.
-        /// </summary>
-        private void InvokeDrawing()
-        {
-            // color drawing
-            var printColor = Frame;
-
-            if (printColor != null)
-            {
-                var bitmapColor = printColor.ToBitmapSource();
-                bitmapColor.Freeze();
-                _ = Dispatcher.BeginInvoke(new ThreadStart(delegate { imgColor.Source = bitmapColor; }));
-            }
-        }
-
-        private async Task UpdateCameraSettingsBasedOnFrameAsync()
-        {
-            if (_cameraSettings == null) return;
-
-            while (true)
-            {
-                using var frame = Frame;
-
-                if (frame == null) continue;
-
-                // Анализируем цвета кадра
-                var (averageRedBrightness, averageGreenBrightness, averageBlueBrightness) = AnalyzeFrameColors(frame);
-                int averageBrightness = (averageRedBrightness + averageGreenBrightness + averageBlueBrightness) / 3;
-
-                lock (_locker)
-                {
-                    // Регулируем CameraControl экспозицию (Exposure)
-                    if (_cameraSettings.CameraControlPropertySettings != null)
-                    {
-                        foreach (var setting in _cameraSettings.CameraControlPropertySettings)
-                        {
-                            if (setting.CameraControlProperty == "Exposure")
-                            {
-                                int targetExposure = CalculateTargetExposure(averageRedBrightness, averageGreenBrightness, averageBlueBrightness);
-                                setting.Value = targetExposure;
-
-                                if (_videoSource is VideoCaptureDevice videoDevice)
-                                {
-                                    videoDevice.SetCameraProperty(
-                                        (CameraControlProperty)Enum.Parse(typeof(CameraControlProperty), setting.CameraControlProperty),
-                                        setting.Value,
-                                        (CameraControlFlags)Enum.Parse(typeof(CameraControlFlags), setting.CameraControlFlag));
-                                }
-                                break;
-                            }
-                        }
-                    }
-
-                    // Регулируем параметры VideoProcAmp яркость (Brightness)
-                    if (_cameraSettings.CameraProcAmpPropertySettings != null)
-                    {
-                        foreach (var setting in _cameraSettings.CameraProcAmpPropertySettings)
-                        {
-                            switch (setting.VideoProcAmpProperty)
-                            {
-                                case "Brightness":
-                                    if (averageBrightness < targetBrightnessMin)
-                                        setting.Value = Math.Min(setting.Value + 10, 64);
-                                    else if (averageBrightness > targetBrightnessMax)
-                                        setting.Value = Math.Max(setting.Value - 10, -64);
-                                    break;
-                                case "Contrast":
-                                    setting.Value = ClampValue(averageBrightness / 3, 0, 255);
-                                    break;
-                                case "Hue":
-                                    setting.Value = ClampValue(averageBrightness % 360, -180, 180);
-                                    break;
-                                case "Saturation":
-                                    setting.Value = ClampValue(averageBrightness / 4, 0, 255);
-                                    break;
-                                case "Sharpness":
-                                    setting.Value = ClampValue(averageBrightness / 5, 0, 255);
-                                    break;
-                                case "Gamma":
-                                    setting.Value = ClampValue(averageBrightness / 2, 1, 500);
-                                    break;
-                                case "WhiteBalance":
-                                    setting.Value = ClampValue(averageBrightness * 50, 2000, 10000);
-                                    break;
-                                case "Gain":
-                                    setting.Value = ClampValue(averageBrightness * 2, 0, 255);
-                                    break;
-                            }
-
-                            if (_videoSource is VideoCaptureDevice videoDevice)
-                            {
-                                videoDevice.SetVideoProcAmpProperty(
-                                    (VideoProcAmpProperty)Enum.Parse(typeof(VideoProcAmpProperty), setting.VideoProcAmpProperty),
-                                    setting.Value,
-                                    (VideoProcAmpFlags)Enum.Parse(typeof(VideoProcAmpFlags), setting.VideoProcAmpFlag));
-                            }
-                        }
-                    }
-                }
-
-                // Задержка между обновлениями
-                await Task.Delay(1000);
-            }
-        }
-
-        #endregion
-
-        #region Private
-
-        private int currentExposure = -4; // Начальное значение экспозиции
-        private const int targetBrightnessMin = 30; // Минимальная целевая яркость int targetBrightnessMin = 100
-        //private const int targetBrightnessMax = 90; // Максимальная целевая яркость int targetBrightnessMax = 150
-        private const int targetBrightnessMax = 80;
-
-        // Анализ цветов в кадре
-        private static (int RedBrightness, int GreenBrightness, int BlueBrightness) AnalyzeFrameColors(Bitmap frame)
-        {
-            // Используем метод ToRGB для получения массива плоскостей RGB
-            float[][,] rgbArray = BitmapMatrix.ToRGB(frame); // [R, G, B], массив двумерных массивов
-
-            int width = rgbArray[0].GetLength(0);  // Ширина
-            int height = rgbArray[0].GetLength(1); // Высота
-
-            float redSum = 0, greenSum = 0, blueSum = 0;
-            int pixelCount = width * height;
-
-            // Проходим по пикселям и суммируем RGB-компоненты
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    redSum += rgbArray[0][x, y];   // R-компонента
-                    greenSum += rgbArray[1][x, y]; // G-компонента
-                    blueSum += rgbArray[2][x, y];  // B-компонента
-                }
-            }
-
-            // Рассчитываем среднюю яркость
-            int redBrightness = (int)(redSum / pixelCount * 255);
-            int greenBrightness = (int)(greenSum / pixelCount * 255);
-            int blueBrightness = (int)(blueSum / pixelCount * 255);
-
-            return (redBrightness, greenBrightness, blueBrightness);
-        }
-
-        private int CalculateTargetExposure(int redBrightness, int greenBrightness, int blueBrightness)
-        {
-            // Рассчитываем среднюю яркость
-            int averageBrightness = (redBrightness + greenBrightness + blueBrightness) / 3;
-
-            //Console.WriteLine($"AverageBrightness111: {averageBrightness}");
-
-            // Проверяем, находится ли яркость в целевом диапазоне
-            if (averageBrightness < targetBrightnessMin)
-            {
-                // Если яркость ниже целевого диапазона, увеличиваем экспозицию
-                currentExposure = Math.Min(currentExposure + 1, 0); // Ограничение сверху (максимум 0)
-            }
-            else if (averageBrightness > targetBrightnessMax)
-            {
-                // Если яркость выше целевого диапазона, уменьшаем экспозицию
-                currentExposure = Math.Max(currentExposure - 1, -8); // Ограничение снизу (минимум -8)
-            }
-
-            Console.WriteLine($"TargetExposure: {currentExposure}");
-
-            return currentExposure;
-        }
-
-        // Вспомогательный метод для ограничения значения в диапазоне
-        private static int ClampValue(int value, int min, int max)
-        {
-            return Math.Max(min, Math.Min(max, value));
-        }
-
         #endregion
 
         #region IDisposable
 
-        private bool _disposed;
-
-        /// <inheritdoc/>
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        /// <inheritdoc/>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposed)
-            {
-                if (disposing)
-                {
-                    _videoSource?.Dispose();
-                    _frame?.Dispose();
-                }
-                _disposed = true;
-            }
-        }
-
-        ~MainWindow()
-        {
-            Dispose(false);
+            _videoSource?.Dispose();
+            _frame?.Dispose();
         }
 
         #endregion
