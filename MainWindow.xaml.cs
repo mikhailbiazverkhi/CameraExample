@@ -3,9 +3,12 @@ using CameraExample.Settings;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using UMapx.Imaging;
 using UMapx.Video;
@@ -189,49 +192,50 @@ namespace CameraExample
             return (averageRed, averageGreen, averageBlue, redMarker, greenMarker, blueMarker);
         }
 
+        #region frame.GetPixel(x, y)1
+        //private (int Red, int Green, int Blue) AnalyzeAverageColors(Bitmap frame)
+        //{
+        //    int pixelCount = frame.Width * frame.Height;
+        //    long redSum = 0, greenSum = 0, blueSum = 0;
+
+        //    for (int y = 0; y < frame.Height; y++)
+        //    {
+        //        for (int x = 0; x < frame.Width; x++)
+        //        {
+        //            var pixel = frame.GetPixel(x, y);  //
+        //            redSum += pixel.R;
+        //            greenSum += pixel.G;
+        //            blueSum += pixel.B;
+        //        }
+        //    }
+        //    //Console.WriteLine($"redSum / pixelCount11 {redSum / pixelCount}  greenSum / pixelCount11 {greenSum / pixelCount}  blueSum / pixelCount11  {blueSum / pixelCount}");
+        //    return ((int)(redSum / pixelCount), (int)(greenSum / pixelCount), (int)(blueSum / pixelCount));
+        //}
+        #endregion
+
+        //BitmapMatrix.ToRGB(frame)
         private (int Red, int Green, int Blue) AnalyzeAverageColors(Bitmap frame)
         {
-            int pixelCount = frame.Width * frame.Height;
-            long redSum = 0, greenSum = 0, blueSum = 0;
+            // Используем BitmapMatrix.ToRGB для получения данных RGB
+            var rgbMatrix = BitmapMatrix.ToRGB(frame);
+            int width = rgbMatrix[0].GetLength(0);
+            int height = rgbMatrix[0].GetLength(1);
 
-            for (int y = 0; y < frame.Height; y++)
+            float redSum = 0, greenSum = 0, blueSum = 0;
+
+            for (int x = 0; x < width; x++)
             {
-                for (int x = 0; x < frame.Width; x++)
+                for (int y = 0; y < height; y++)
                 {
-                    var pixel = frame.GetPixel(x, y);  //
-                    redSum += pixel.R;
-                    greenSum += pixel.G;
-                    blueSum += pixel.B;
+                    redSum += rgbMatrix[2][x, y] * 256;
+                    greenSum += rgbMatrix[1][x, y] * 256;
+                    blueSum += rgbMatrix[0][x, y] * 256;
                 }
             }
-
+            int pixelCount = width * height;
             return ((int)(redSum / pixelCount), (int)(greenSum / pixelCount), (int)(blueSum / pixelCount));
         }
 
-        //!!!!! BitmapMatrix.ToRGB(frame)
-
-        //private (int Red, int Green, int Blue) AnalyzeAverageColors(Bitmap frame)
-        //{
-        //    // Используем BitmapMatrix.ToRGB для получения данных RGB
-        //    var rgbMatrix = BitmapMatrix.ToRGB(frame);
-        //    int height = rgbMatrix.GetLength(0);
-        //    int width = rgbMatrix.GetLength(1);
-
-        //    float redSum = 0, greenSum = 0, blueSum = 0;
-
-        //    for (int y = 0; y < height; y++)
-        //    {
-        //        for (int x = 0; x < width; x++)
-        //        {
-        //            redSum += rgbMatrix[0][x, y];
-        //            greenSum += rgbMatrix[1][x, y];
-        //            blueSum += rgbMatrix[2][x, y];
-        //        }
-        //    }
-
-        //    int pixelCount = width * height;
-        //    return ((int)(redSum / pixelCount), (int)(greenSum / pixelCount), (int)(blueSum / pixelCount));
-        //}
 
         private (int RedMarker, int GreenMarker, int BlueMarker) AnalyzeMarkers(Bitmap frame)
         {
@@ -242,52 +246,56 @@ namespace CameraExample
             );
         }
 
-        private int GetAverageBrightness(Bitmap frame, System.Drawing.Point position, int size)
-        {
-            int totalBrightness = 0, pixelCount = 0;
-
-            for (int y = position.Y - size / 2; y < position.Y + size / 2; y++)
-            {
-                for (int x = position.X - size / 2; x < position.X + size / 2; x++)
-                {
-                    if (x >= 0 && x < frame.Width && y >= 0 && y < frame.Height)
-                    {
-                        var pixel = frame.GetPixel(x, y);  //
-                        totalBrightness += (int)(0.2126 * pixel.R + 0.7152 * pixel.G + 0.0722 * pixel.B);
-                        pixelCount++;
-                    }
-                }
-            }
-
-            return pixelCount > 0 ? totalBrightness / pixelCount : 0;
-        }
-
-        //!!!!! BitmapMatrix.ToRGB(frame)
-
+        #region frame.GetPixel(x, y)2
         //private int GetAverageBrightness(Bitmap frame, System.Drawing.Point position, int size)
         //{
-        //    // Используем BitmapMatrix.ToRGB для получения данных RGB
-        //    var rgbMatrix = BitmapMatrix.ToRGB(frame);
-        //    int height = rgbMatrix.GetLength(0);
-        //    int width = rgbMatrix.GetLength(1);
-
         //    int totalBrightness = 0, pixelCount = 0;
 
         //    for (int y = position.Y - size / 2; y < position.Y + size / 2; y++)
         //    {
         //        for (int x = position.X - size / 2; x < position.X + size / 2; x++)
         //        {
-        //            if (x >= 0 && x < width && y >= 0 && y < height)
+        //            if (x >= 0 && x < frame.Width && y >= 0 && y < frame.Height)
         //            {
-        //                int brightness = (int)(0.2126 * rgbMatrix[0][y, x] + 0.7152 * rgbMatrix[1][y, x] + 0.0722 * rgbMatrix[2][y, x]);
-        //                totalBrightness += brightness;
+        //                var pixel = frame.GetPixel(x, y);  //
+        //                totalBrightness += (int)(0.2126 * pixel.R + 0.7152 * pixel.G + 0.0722 * pixel.B);
         //                pixelCount++;
         //            }
         //        }
         //    }
 
+        //    Console.WriteLine($"pixelCount3 {pixelCount}");
+        //    Console.WriteLine($"totalBrightness / pixelCount3 {totalBrightness / pixelCount}");
+
         //    return pixelCount > 0 ? totalBrightness / pixelCount : 0;
         //}
+        #endregion
+
+        //BitmapMatrix.ToRGB(frame)
+        private int GetAverageBrightness(Bitmap frame, System.Drawing.Point position, int size)
+        {
+            // Используем BitmapMatrix.ToRGB для получения данных RGB
+            var rgbMatrix = BitmapMatrix.ToRGB(frame);
+            int height = rgbMatrix[0].GetLength(0);
+            int width = rgbMatrix[0].GetLength(1);
+
+
+            int totalBrightness = 0, pixelCount = 0;
+
+            for (int y = position.Y - size / 2; y < position.Y + size / 2; y++)
+            {
+                for (int x = position.X - size / 2; x < position.X + size / 2; x++)
+                {
+                    if (x >= 0 && x < width && y >= 0 && y < height)
+                    {
+                        int brightness = (int)(0.2126 * rgbMatrix[0][y, x] * 256 + 0.7152 * rgbMatrix[1][y, x] * 256 + 0.0722 * rgbMatrix[2][y, x] * 256);
+                        totalBrightness += brightness;
+                        pixelCount++;
+                    }
+                }
+            }
+            return pixelCount > 0 ? totalBrightness / pixelCount : 0;
+        }
 
 
         private int CalculateHueAdjustment(int redMarker, int greenMarker, int blueMarker)
@@ -392,6 +400,7 @@ namespace CameraExample
             _videoSource?.SignalToStop();
             _videoSource?.WaitForStop();
             Dispose();
+            Console.WriteLine("Video source has been successfully stopped");
         }
         #endregion
 
