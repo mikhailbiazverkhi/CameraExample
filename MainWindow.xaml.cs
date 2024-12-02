@@ -139,30 +139,30 @@ namespace CameraExample
         }
 
 
-        //private void UpdateBrightness(int red, int green, int blue)
-        //{
-        //    int averageBrightness = (red + green + blue) / 3;
-        //    if (averageBrightness < TargetBrightnessMin)
-        //        _currentBrightness = Math.Clamp(_currentBrightness + 8, -64, 64);
-        //    else if (averageBrightness > TargetBrightnessMax)
-        //        _currentBrightness = Math.Clamp(_currentBrightness - 8, -64, 64);
-
-        //    SetProcAmpProperty("Brightness", _currentBrightness);
-        //}
-
         private void UpdateBrightness(int red, int green, int blue)
         {
             int averageBrightness = (red + green + blue) / 3;
-            int targetBrightness = _currentBrightness;
-
             if (averageBrightness < TargetBrightnessMin)
-                targetBrightness = Math.Clamp(_currentBrightness + 8, -64, 64);
+                _currentBrightness = Math.Clamp(_currentBrightness + 8, -64, 64);
             else if (averageBrightness > TargetBrightnessMax)
-                targetBrightness = Math.Clamp(_currentBrightness - 8, -64, 64);
+                _currentBrightness = Math.Clamp(_currentBrightness - 8, -64, 64);
 
-            _currentBrightness = SmoothAdjustment(_currentBrightness, targetBrightness);
             SetProcAmpProperty("Brightness", _currentBrightness);
         }
+
+        //private void UpdateBrightness(int red, int green, int blue)
+        //{
+        //    int averageBrightness = (red + green + blue) / 3;
+        //    int targetBrightness = _currentBrightness;
+
+        //    if (averageBrightness < TargetBrightnessMin)
+        //        targetBrightness = Math.Clamp(_currentBrightness + 8, -64, 64);
+        //    else if (averageBrightness > TargetBrightnessMax)
+        //        targetBrightness = Math.Clamp(_currentBrightness - 8, -64, 64);
+
+        //    _currentBrightness = SmoothAdjustment(_currentBrightness, targetBrightness);
+        //    SetProcAmpProperty("Brightness", _currentBrightness);
+        //}
 
         private void UpdateHue(int red, int green, int blue)
         {
@@ -197,55 +197,55 @@ namespace CameraExample
             return Math.Clamp(hueAdjustment, -30, 30); // Диапазон корректировки Hue
         }
 
-        //private void UpdateContrast(int red, int green, int blue)
-        //{
-        //    int contrastAdjustment = CalculateContrastAdjustment(red, green, blue, _currentContrast);
-        //    if (contrastAdjustment != _currentContrast)
-        //    {
-        //        _currentContrast = contrastAdjustment;
-        //        SetProcAmpProperty("Contrast", contrastAdjustment);
-        //    }
-        //}
-
-        //private int CalculateContrastAdjustment(int redMarker, int greenMarker, int blueMarker, int currentContrast)
-        //{
-        //    //int minColor = Math.Min(red, Math.Min(green, blue));
-        //    //int maxColor = Math.Max(red, Math.Max(green, blue));
-        //    //int brightnessRange = maxColor - minColor;
-        //    //int idealContrast = brightnessRange < 50 ? 80 : (brightnessRange > 150 ? 50 : 65);
-        //    //return Math.Clamp(currentContrast + (idealContrast - currentContrast) / 4, 0, 100);
-
-        //    // Рассчитать разброс яркости
-        //    int minColor = Math.Min(redMarker, Math.Min(greenMarker, blueMarker));
-        //    int maxColor = Math.Max(redMarker, Math.Max(greenMarker, blueMarker));
-        //    int brightnessRange = maxColor - minColor;
-
-        //    // Определить идеальный контраст для текущего разброса
-        //    int idealContrast = brightnessRange < TargetBrightnessMin ? 80 : (brightnessRange > TargetBrightnessMax ? 50 : 65);
-
-        //    // Плавно скорректировать контраст к целевому значению
-        //    int newContrast = currentContrast + (idealContrast - currentContrast) / 4;
-
-        //    // Ограничить диапазон контраста
-        //    return Math.Clamp(newContrast, 0, 100);
-
-        //}
-
         private void UpdateContrast(int red, int green, int blue)
         {
-            int minColor = Math.Min(red, Math.Min(green, blue));
-            int maxColor = Math.Max(red, Math.Max(green, blue));
-            int brightnessRange = maxColor - minColor;
-
-            int idealContrast = brightnessRange < TargetBrightnessMin ? 80 :
-                                (brightnessRange > TargetBrightnessMax ? 50 : 65);
-
-            if (Math.Abs(_currentContrast - idealContrast) > 5) // Допустимый диапазон изменения
+            int contrastAdjustment = CalculateContrastAdjustment(red, green, blue, _currentContrast);
+            if (contrastAdjustment != _currentContrast)
             {
-                _currentContrast = SmoothAdjustment(_currentContrast, idealContrast);
-                SetProcAmpProperty("Contrast", _currentContrast);
+                _currentContrast = contrastAdjustment;
+                SetProcAmpProperty("Contrast", contrastAdjustment);
             }
         }
+
+        private int CalculateContrastAdjustment(int redMarker, int greenMarker, int blueMarker, int currentContrast)
+        {
+            //int minColor = Math.Min(red, Math.Min(green, blue));
+            //int maxColor = Math.Max(red, Math.Max(green, blue));
+            //int brightnessRange = maxColor - minColor;
+            //int idealContrast = brightnessRange < 50 ? 80 : (brightnessRange > 150 ? 50 : 65);
+            //return Math.Clamp(currentContrast + (idealContrast - currentContrast) / 4, 0, 100);
+
+            // Рассчитать разброс яркости
+            int minColor = Math.Min(redMarker, Math.Min(greenMarker, blueMarker));
+            int maxColor = Math.Max(redMarker, Math.Max(greenMarker, blueMarker));
+            int brightnessRange = maxColor - minColor;
+
+            // Определить идеальный контраст для текущего разброса
+            int idealContrast = brightnessRange < TargetBrightnessMin ? 80 : (brightnessRange > TargetBrightnessMax ? 50 : 65);
+
+            // Плавно скорректировать контраст к целевому значению
+            int newContrast = currentContrast + (idealContrast - currentContrast) / 4;
+
+            // Ограничить диапазон контраста
+            return Math.Clamp(newContrast, 0, 100);
+
+        }
+
+        //private void UpdateContrast(int red, int green, int blue)
+        //{
+        //    int minColor = Math.Min(red, Math.Min(green, blue));
+        //    int maxColor = Math.Max(red, Math.Max(green, blue));
+        //    int brightnessRange = maxColor - minColor;
+
+        //    int idealContrast = brightnessRange < TargetBrightnessMin ? 80 :
+        //                        (brightnessRange > TargetBrightnessMax ? 50 : 65);
+
+        //    if (Math.Abs(_currentContrast - idealContrast) > 5) // Допустимый диапазон изменения
+        //    {
+        //        _currentContrast = SmoothAdjustment(_currentContrast, idealContrast);
+        //        SetProcAmpProperty("Contrast", _currentContrast);
+        //    }
+        //}
 
         private void UpdateWhiteBalance(int red, int green, int blue)
         {
@@ -264,10 +264,10 @@ namespace CameraExample
             SetProcAmpProperty("WhiteBalance", whiteBalanceCorrection);
         }
 
-        private int SmoothAdjustment(int currentValue, int targetValue, float smoothingFactor = 0.1f)
-        {
-            return (int)(currentValue + (targetValue - currentValue) * smoothingFactor);
-        }
+        //private int SmoothAdjustment(int currentValue, int targetValue, float smoothingFactor = 0.1f)
+        //{
+        //    return (int)(currentValue + (targetValue - currentValue) * smoothingFactor);
+        //}
 
         private void SetCameraProperty(string property, int value)
         {
@@ -294,27 +294,6 @@ namespace CameraExample
         #endregion
 
         #region Frame(Markers) Analysis
-
-        #region frame.GetPixel(x, y)1
-        //private (int Red, int Green, int Blue) AnalyzeAverageColors(Bitmap frame)
-        //{
-        //    int pixelCount = frame.Width * frame.Height;
-        //    long redSum = 0, greenSum = 0, blueSum = 0;
-
-        //    for (int y = 0; y < frame.Height; y++)
-        //    {
-        //        for (int x = 0; x < frame.Width; x++)
-        //        {
-        //            var pixel = frame.GetPixel(x, y);  //
-        //            redSum += pixel.R;
-        //            greenSum += pixel.G;
-        //            blueSum += pixel.B;
-        //        }
-        //    }
-        //    //Console.WriteLine($"redSum / pixelCount11 {redSum / pixelCount}  greenSum / pixelCount11 {greenSum / pixelCount}  blueSum / pixelCount11  {blueSum / pixelCount}");
-        //    return ((int)(redSum / pixelCount), (int)(greenSum / pixelCount), (int)(blueSum / pixelCount));
-        //}
-        #endregion
 
         private (int Red, int Green, int Blue) AnalyzeMarkers(Bitmap frame)
         {
