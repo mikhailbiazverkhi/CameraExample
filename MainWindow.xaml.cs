@@ -92,7 +92,7 @@ namespace CameraExample
                     new CameraProcAmpPropertySettings
                     {
                         VideoProcAmpProperty = "Contrast",
-                        Value = 0, //65
+                        Value = 0, 
                         VideoProcAmpFlag = "Auto"
                     },
                     new CameraProcAmpPropertySettings
@@ -327,7 +327,7 @@ namespace CameraExample
         {
             try
             {
-                using var frame = (Bitmap)eventArgs.Frame.Clone();
+                Bitmap frame = (Bitmap)eventArgs.Frame.Clone();
                 Frame = AddColorMarkers(frame);
                 UpdateImage();
             }
