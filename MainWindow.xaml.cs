@@ -9,6 +9,8 @@ using System.Windows.Threading;
 using UMapx.Imaging;
 using UMapx.Video;
 using UMapx.Video.DirectShow;
+using IniParser;
+using IniParser.Model;
 
 namespace CameraExample
 {
@@ -43,7 +45,10 @@ namespace CameraExample
             InitializeComponent();
             Closing += MainWindow_Closing;
 
-            InitializeCameraSettings();
+            string iniFilePath = "settings.ini"; // Путь к вашему INI-файлу C:\GitHub_repos\CameraExample\bin\Debug\net8.0-windows\settings.ini
+            LoadCameraSettingsFromIni(iniFilePath);
+            //InitializeCameraSettings();
+
             _videoSource = VideoSourceUtils.GetVideoDevice(_cameraSettings);
 
             if (_videoSource != null)
@@ -60,50 +65,100 @@ namespace CameraExample
 
         #region Camera Settings
 
-        private void InitializeCameraSettings()
+        private void LoadCameraSettingsFromIni(string filePath)
         {
+            var parser = new FileIniDataParser();
+            IniData iniData = parser.ReadFile(filePath);
+
             _cameraSettings = new CameraSettings
             {
-                CameraId = 1,
-                ResolutionId = 0,
+                CameraId = int.Parse(iniData["CameraSettings"]["CameraId"]),
+                ResolutionId = int.Parse(iniData["CameraSettings"]["ResolutionId"]),
                 CameraControlPropertySettings = new List<CameraControlPropertySettings>
-                {
-                    new CameraControlPropertySettings
-                    {
-                        CameraControlProperty = "Exposure",
-                        Value = 0,
-                        CameraControlFlag = "Auto"
-                    }
-                },
+        {
+            new CameraControlPropertySettings
+            {
+                CameraControlProperty = "Exposure",
+                Value = int.Parse(iniData["CameraControlPropertySettings"]["Exposure"]),
+                CameraControlFlag = iniData["CameraControlPropertySettings"]["ExposureFlag"]
+            }
+        },
                 CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings>
-                {
-                    new CameraProcAmpPropertySettings
-                    {
-                        VideoProcAmpProperty = "Brightness",
-                        Value = 0,
-                        VideoProcAmpFlag = "Auto"
-                    },
-                    new CameraProcAmpPropertySettings
-                    {
-                        VideoProcAmpProperty = "Hue",
-                        Value = 0,
-                        VideoProcAmpFlag = "Auto"
-                    },
-                    new CameraProcAmpPropertySettings
-                    {
-                        VideoProcAmpProperty = "Contrast",
-                        Value = 0, 
-                        VideoProcAmpFlag = "Auto"
-                    },
-                    new CameraProcAmpPropertySettings
-                    {
-                        VideoProcAmpProperty = "WhiteBalance",
-                        Value = 4000, // Начальное значение белого баланса (например, 4000 К)
-                        VideoProcAmpFlag = "Auto"
-                    }
-                }
+        {
+            new CameraProcAmpPropertySettings
+            {
+                VideoProcAmpProperty = "Brightness",
+                Value = int.Parse(iniData["CameraProcAmpPropertySettings"]["Brightness"]),
+                VideoProcAmpFlag = iniData["CameraProcAmpPropertySettings"]["BrightnessFlag"]
+            },
+            new CameraProcAmpPropertySettings
+            {
+                VideoProcAmpProperty = "Hue",
+                Value = int.Parse(iniData["CameraProcAmpPropertySettings"]["Hue"]),
+                VideoProcAmpFlag = iniData["CameraProcAmpPropertySettings"]["HueFlag"]
+            },
+            new CameraProcAmpPropertySettings
+            {
+                VideoProcAmpProperty = "Contrast",
+                Value = int.Parse(iniData["CameraProcAmpPropertySettings"]["Contrast"]),
+                VideoProcAmpFlag = iniData["CameraProcAmpPropertySettings"]["ContrastFlag"]
+            },
+            new CameraProcAmpPropertySettings
+            {
+                VideoProcAmpProperty = "WhiteBalance",
+                Value = int.Parse(iniData["CameraProcAmpPropertySettings"]["WhiteBalance"]),
+                VideoProcAmpFlag = iniData["CameraProcAmpPropertySettings"]["WhiteBalanceFlag"]
+            }
+        }
             };
         }
+
+
+
+        //private void InitializeCameraSettings()
+        //{
+        //    _cameraSettings = new CameraSettings
+        //    {
+        //        CameraId = 1,
+        //        ResolutionId = 0,// 3
+        //        CameraControlPropertySettings = new List<CameraControlPropertySettings>
+        //        {
+        //            new CameraControlPropertySettings
+        //            {
+        //                CameraControlProperty = "Exposure",
+        //                Value = 0,
+        //                CameraControlFlag = "None"
+        //            }
+        //        },
+        //        CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings>
+        //        {
+        //            new CameraProcAmpPropertySettings
+        //            {
+        //                VideoProcAmpProperty = "Brightness",
+        //                Value = 0,
+        //                VideoProcAmpFlag = "None"
+        //            },
+        //            new CameraProcAmpPropertySettings
+        //            {
+        //                VideoProcAmpProperty = "Hue",
+        //                Value = 0,
+        //                VideoProcAmpFlag = "None"
+        //            },
+        //            new CameraProcAmpPropertySettings
+        //            {
+        //                VideoProcAmpProperty = "Contrast",
+        //                Value = 0, 
+        //                VideoProcAmpFlag = "None"
+        //            },
+        //            new CameraProcAmpPropertySettings
+        //            {
+        //                VideoProcAmpProperty = "WhiteBalance",
+        //                Value = 4000, // Начальное значение белого баланса (например, 4000 К)
+        //                VideoProcAmpFlag = "None"
+        //            }
+        //        }
+        //    };
+        //}
 
         private async Task UpdateCameraSettingsAsync()
         {
