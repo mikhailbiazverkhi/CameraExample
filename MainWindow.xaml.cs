@@ -1,20 +1,15 @@
 ﻿using CameraExample.Core;
 using CameraExample.Settings;
+using IniParser;
+using IniParser.Model;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
-using UMapx.Imaging;
 using UMapx.Video;
 using UMapx.Video.DirectShow;
-using IniParser;
-using IniParser.Model;
-using System.Windows.Controls;
-using System.Windows.Media.Imaging;
-using System.Diagnostics;
-using UMapx.Window;
 
 namespace CameraExample
 {
@@ -38,6 +33,8 @@ namespace CameraExample
         private int _currentHue = 0;              // Нейтральный оттенок
         private int _currentWhiteBalance = 4500; // Нейтральная цветовая температура
 
+        private System.Drawing.Point _redMarkerPosition, _greenMarkerPosition, _blueMarkerPosition;
+        int indicatorSize; // Размер цветовой точки места установки маркера
 
         #endregion
 
@@ -118,7 +115,25 @@ namespace CameraExample
             }
         }
             };
+
+            // Load marker positions
+            _redMarkerPosition = new System.Drawing.Point(
+                int.Parse(iniData["MarkerPositions"]["RedMarkerX"]),
+                int.Parse(iniData["MarkerPositions"]["RedMarkerY"]));
+
+            _greenMarkerPosition = new System.Drawing.Point(
+                int.Parse(iniData["MarkerPositions"]["GreenMarkerX"]),
+                int.Parse(iniData["MarkerPositions"]["GreenMarkerY"]));
+
+            _blueMarkerPosition = new System.Drawing.Point(
+                int.Parse(iniData["MarkerPositions"]["BlueMarkerX"]),
+                int.Parse(iniData["MarkerPositions"]["BlueMarkerY"]));
+
+
+            indicatorSize = int.Parse(iniData["PointerSize"]["IndicatorSize"]);
         }
+
+
 
         private async Task UpdateCameraSettingsAsync()
         {
@@ -127,15 +142,21 @@ namespace CameraExample
                 using var frame = Frame;
                 if (frame == null) continue;
 
-                // Анализируем цвет маркера в заданной позиции
-                var redMarkerData = GetMarkerColor(frame, new System.Drawing.Point(50, 50), 50);
+                // Определение зон исключения
+                var exclusionZones = new List<Rectangle>
+                {
+                    new Rectangle(_redMarkerPosition.X - indicatorSize / 2, _redMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
+                    new Rectangle(_greenMarkerPosition.X - indicatorSize / 2, _greenMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
+                    new Rectangle(_blueMarkerPosition.X - indicatorSize / 2, _blueMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize)
+                };
+
+                // Анализируем цвет бублика в заданной позиции
+                var redMarkerData = GetMarkerColor(frame, _redMarkerPosition, indicatorSize + 30, exclusionZones);
                 Console.WriteLine($"red Marker Color: {redMarkerData.Color}, Brightness: {redMarkerData.Brightness}");
-
-                var greenMarkerData = GetMarkerColor(frame, new System.Drawing.Point(frame.Width - 50, 50), 50);
+                var greenMarkerData = GetMarkerColor(frame, _greenMarkerPosition, indicatorSize + 30, exclusionZones);
                 Console.WriteLine($"green Marker Color: {greenMarkerData.Color}, Brightness: {greenMarkerData.Brightness}");
-
-                var blueMarkerData = GetMarkerColor(frame, new System.Drawing.Point(frame.Width / 2, frame.Height - 50), 50);
-                Console.WriteLine($"blue Marker Color: {blueMarkerData.Color}, Brightness: {blueMarkerData.Brightness}");
+                var blueMarkerData = GetMarkerColor(frame, _blueMarkerPosition, indicatorSize + 30, exclusionZones);
+                Console.WriteLine($"blue Marker Color: {blueMarkerData.Color}, Brightness: {blueMarkerData.Brightness}");            
 
                 lock (_locker)
                 {
@@ -146,7 +167,7 @@ namespace CameraExample
                     UpdateContrast(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
                 }
 
-                await Task.Delay(2000);
+                await Task.Delay(2500);
             }
         }
 
@@ -267,18 +288,10 @@ namespace CameraExample
 
         #region Frame (markers) analysis
 
-        private static (string Color, int Brightness) GetMarkerColor(Bitmap frame, System.Drawing.Point position, int size)
+        private static (string Color, int Brightness) GetMarkerColor(Bitmap frame, System.Drawing.Point position, int size, List<Rectangle> exclusionZones)
         {
             int totalR = 0, totalG = 0, totalB = 0, pixelCount = 0;
             int halfSize = size / 2;
-
-            // Зоны исключения для анализа
-            var exclusionZones = new List<Rectangle>
-    {
-        new Rectangle(40, 40, 20, 20),
-        new Rectangle(frame.Width - 60, 40, 20, 20),
-        new Rectangle(frame.Width / 2 - 10, frame.Height - 60, 20, 20)
-    };
 
             for (int y = Math.Max(0, position.Y - halfSize); y < Math.Min(frame.Height, position.Y + halfSize); y++)
             {
@@ -311,6 +324,51 @@ namespace CameraExample
 
             return ("Unknown", 0);
         }
+
+        //    private static (string Color, int Brightness) GetMarkerColor(Bitmap frame, System.Drawing.Point position, int size)
+        //    {
+        //        int totalR = 0, totalG = 0, totalB = 0, pixelCount = 0;
+        //        int halfSize = size / 2;
+
+        //        // Зоны исключения для анализа
+        //        var exclusionZones = new List<Rectangle>
+        //{
+        //    new Rectangle(40, 40, 20, 20),
+        //    new Rectangle(frame.Width - 60, 40, 20, 20),
+        //    new Rectangle(frame.Width / 2 - 10, frame.Height - 60, 20, 20)
+        //};
+
+        //        for (int y = Math.Max(0, position.Y - halfSize); y < Math.Min(frame.Height, position.Y + halfSize); y++)
+        //        {
+        //            for (int x = Math.Max(0, position.X - halfSize); x < Math.Min(frame.Width, position.X + halfSize); x++)
+        //            {
+        //                var pixelPos = new System.Drawing.Point(x, y);
+        //                if (exclusionZones.Exists(zone => zone.Contains(pixelPos)))
+        //                    continue; // Игнорируем пиксель, если он находится в зоне исключения
+
+        //                Color pixel = frame.GetPixel(x, y);
+        //                totalR += pixel.R;
+        //                totalG += pixel.G;
+        //                totalB += pixel.B;
+        //                pixelCount++;
+        //            }
+        //        }
+
+        //        if (pixelCount == 0)
+        //            return ("Unknown", 0); // Если нет пикселей для анализа
+
+        //        // Рассчитываем средние значения
+        //        int avgR = totalR / pixelCount;
+        //        int avgG = totalG / pixelCount;
+        //        int avgB = totalB / pixelCount;
+
+        //        // Определение цвета на основе RGB
+        //        if (avgR > avgG && avgR > avgB) return ("Red", avgR);
+        //        if (avgG > avgR && avgG > avgB) return ("Green", avgG);
+        //        if (avgB > avgR && avgB > avgG) return ("Blue", avgB);
+
+        //        return ("Unknown", 0);
+        //    }
         #endregion
 
         #region Static methods (calculations)
@@ -383,13 +441,12 @@ namespace CameraExample
         /// </summary>
         /// <param name="sender">sender</param>
         /// <param name="eventArgs">event arguments</param>
-
         private void OnNewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             try
             {
                 Bitmap frame = (Bitmap)eventArgs.Frame.Clone();
-                Frame = AddColorMarkers(frame);
+                Frame = AddColorMarkers(frame, _redMarkerPosition, _greenMarkerPosition, _blueMarkerPosition, indicatorSize);
                 UpdateImage();
             }
             catch (Exception ex)
@@ -398,22 +455,20 @@ namespace CameraExample
             }
         }
 
-        private static Bitmap AddColorMarkers(Bitmap frame)
+        private static Bitmap AddColorMarkers(Bitmap frame, System.Drawing.Point redMarker, System.Drawing.Point greenMarker, System.Drawing.Point blueMarker, int indicatorSize)
         {
             using Graphics g = Graphics.FromImage(frame);
-            int markerSize = 20;
+            //int markerSize = 20;
 
-            // Координаты маркеров
-            var redMarkerRect = new Rectangle(40, 40, markerSize, markerSize);
-            var greenMarkerRect = new Rectangle(frame.Width - 60, 40, markerSize, markerSize);
-            var blueMarkerRect = new Rectangle(frame.Width / 2 - 10, frame.Height - 60, markerSize, markerSize);
+            // Draw markers based on positions
+            var redMarkerRect = new Rectangle(redMarker.X - indicatorSize / 2, redMarker.Y - indicatorSize / 2, indicatorSize, indicatorSize);
+            var greenMarkerRect = new Rectangle(greenMarker.X - indicatorSize / 2, greenMarker.Y - indicatorSize / 2, indicatorSize, indicatorSize);
+            var blueMarkerRect = new Rectangle(blueMarker.X - indicatorSize / 2, blueMarker.Y - indicatorSize / 2, indicatorSize, indicatorSize);
 
-            // Рисуем маркеры
             g.FillEllipse(Brushes.Red, redMarkerRect);
             g.FillEllipse(Brushes.Green, greenMarkerRect);
             g.FillEllipse(Brushes.Blue, blueMarkerRect);
 
-            // Возвращаем кадр с маркерами
             return frame;
         }
 
