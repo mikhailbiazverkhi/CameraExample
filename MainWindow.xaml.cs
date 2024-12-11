@@ -120,53 +120,6 @@ namespace CameraExample
             };
         }
 
-
-
-        //private void InitializeCameraSettings()
-        //{
-        //    _cameraSettings = new CameraSettings
-        //    {
-        //        CameraId = 1,
-        //        ResolutionId = 0,// 3
-        //        CameraControlPropertySettings = new List<CameraControlPropertySettings>
-        //        {
-        //            new CameraControlPropertySettings
-        //            {
-        //                CameraControlProperty = "Exposure",
-        //                Value = 0,
-        //                CameraControlFlag = "None"
-        //            }
-        //        },
-        //        CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings>
-        //        {
-        //            new CameraProcAmpPropertySettings
-        //            {
-        //                VideoProcAmpProperty = "Brightness",
-        //                Value = 0,
-        //                VideoProcAmpFlag = "None"
-        //            },
-        //            new CameraProcAmpPropertySettings
-        //            {
-        //                VideoProcAmpProperty = "Hue",
-        //                Value = 0,
-        //                VideoProcAmpFlag = "None"
-        //            },
-        //            new CameraProcAmpPropertySettings
-        //            {
-        //                VideoProcAmpProperty = "Contrast",
-        //                Value = 0, 
-        //                VideoProcAmpFlag = "None"
-        //            },
-        //            new CameraProcAmpPropertySettings
-        //            {
-        //                VideoProcAmpProperty = "WhiteBalance",
-        //                Value = 4000, // Начальное значение белого баланса (например, 4000 К)
-        //                VideoProcAmpFlag = "None"
-        //            }
-        //        }
-        //    };
-        //}
-
         private async Task UpdateCameraSettingsAsync()
         {
             while (true)
@@ -174,17 +127,14 @@ namespace CameraExample
                 using var frame = Frame;
                 if (frame == null) continue;
 
-                //var (redMarker, greenMarker, blueMarker) = AnalyzeMarkers(frame);
-                //Console.WriteLine($"Average R={redMarker}, G={greenMarker}, B={blueMarker}");
-
                 // Анализируем цвет маркера в заданной позиции
-                var redMarkerData = GetMarkerColor(frame, new System.Drawing.Point(50, 50), 20);
+                var redMarkerData = GetMarkerColor(frame, new System.Drawing.Point(50, 50), 50);
                 Console.WriteLine($"red Marker Color: {redMarkerData.Color}, Brightness: {redMarkerData.Brightness}");
 
-                var greenMarkerData = GetMarkerColor(frame, new System.Drawing.Point(frame.Width - 50, 50), 20);
+                var greenMarkerData = GetMarkerColor(frame, new System.Drawing.Point(frame.Width - 50, 50), 50);
                 Console.WriteLine($"green Marker Color: {greenMarkerData.Color}, Brightness: {greenMarkerData.Brightness}");
 
-                var blueMarkerData = GetMarkerColor(frame, new System.Drawing.Point(frame.Width / 2, frame.Height - 50), 2);
+                var blueMarkerData = GetMarkerColor(frame, new System.Drawing.Point(frame.Width / 2, frame.Height - 50), 50);
                 Console.WriteLine($"blue Marker Color: {blueMarkerData.Color}, Brightness: {blueMarkerData.Brightness}");
 
                 lock (_locker)
@@ -192,65 +142,13 @@ namespace CameraExample
                     UpdateExposure(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
                     UpdateBrightness(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
                     UpdateHue(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
+                    UpdateWhiteBalance(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
                     UpdateContrast(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
-                    UpdateWhiteBalance(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness); // Новый вызов
-
-                    //UpdateExposure(redMarker, greenMarker, blueMarker);
-                    //UpdateBrightness(redMarker, greenMarker, blueMarker);
-                    //UpdateHue(redMarker, greenMarker, blueMarker);
-                    //UpdateContrast(redMarker, greenMarker, blueMarker);
-                    //UpdateWhiteBalance(redMarker, greenMarker, blueMarker); // Новый вызов
                 }
 
                 await Task.Delay(2000);
             }
         }
-
-        //private void UpdateExposure(int red, int green, int blue)
-        //{
-        //    int averageBrightness = (red + green + blue) / 3;
-
-        //    // Рассчитываем целевое значение экспозиции
-        //    int targetExposure = _currentExposure;
-        //    if (averageBrightness < TargetBrightnessMin)
-        //    {
-        //        targetExposure = Math.Clamp(_currentExposure + 1, -8, 0);
-        //    }
-        //    else if (averageBrightness > TargetBrightnessMax)
-        //    {
-        //        targetExposure = Math.Clamp(_currentExposure - 1, -8, 0);
-        //    }
-
-        //    // Сглаживание изменения экспозиции
-        //    _currentExposure = (int)(_currentExposure * 0.8 + targetExposure * 0.2);
-
-        //    SetCameraProperty("Exposure", _currentExposure);
-        //}
-
-        //private void UpdateBrightness(int red, int green, int blue)
-        //{
-        //    double redWeight = 0.299;
-        //    double greenWeight = 0.587;
-        //    double blueWeight = 0.114;
-
-        //    double weightedBrightness = (red * redWeight + green * greenWeight + blue * blueWeight);
-
-        //    // Рассчитываем целевое значение яркости
-        //    int targetBrightness = _currentBrightness;
-        //    if (weightedBrightness < TargetBrightnessMin)
-        //    {
-        //        targetBrightness = Math.Clamp(_currentBrightness + 8, -64, 64);
-        //    }
-        //    else if (weightedBrightness > TargetBrightnessMax)
-        //    {
-        //        targetBrightness = Math.Clamp(_currentBrightness - 8, -64, 64);
-        //    }
-
-        //    // Сглаживание изменения яркости
-        //    _currentBrightness = (int)(_currentBrightness * 0.8 + targetBrightness * 0.2);
-
-        //    SetProcAmpProperty("Brightness", _currentBrightness);
-        //}
 
         private void UpdateExposure(int red, int green, int blue)
         {
@@ -294,63 +192,6 @@ namespace CameraExample
             // Устанавливаем новое значение яркости
             SetProcAmpProperty("Brightness", _currentBrightness);
         }
-
-
-        //private void UpdateExposure(int red, int green, int blue)
-        //{
-        //    int averageBrightness = (red + green + blue) / 3;
-        //    if (averageBrightness < TargetBrightnessMin)
-        //        _currentExposure = Math.Min(_currentExposure + 1, 0);
-        //    else if (averageBrightness > TargetBrightnessMax)
-        //        _currentExposure = Math.Max(_currentExposure - 1, -8);
-
-        //    SetCameraProperty("Exposure", _currentExposure);
-        //}
-
-
-        //private void UpdateBrightness(int red, int green, int blue)
-        //{
-        //    int averageBrightness = (red + green + blue) / 3;
-        //    if (averageBrightness < TargetBrightnessMin)
-        //        _currentBrightness = Math.Clamp(_currentBrightness + 8, -64, 64);
-        //    else if (averageBrightness > TargetBrightnessMax)
-        //        _currentBrightness = Math.Clamp(_currentBrightness - 8, -64, 64);
-
-        //    SetProcAmpProperty("Brightness", _currentBrightness);
-        //}
-
-        //private void UpdateHue(int red, int green, int blue)
-        //{
-        //    int hueAdjustment = CalculateHueAdjustment(red, green, blue);
-        //    SetProcAmpProperty("Hue", hueAdjustment);
-        //}
-
-        //private void UpdateContrast(int red, int green, int blue)
-        //{
-        //    int contrastAdjustment = CalculateContrastAdjustment(red, green, blue, _currentContrast);
-        //    if (contrastAdjustment != _currentContrast)
-        //    {
-        //        _currentContrast = contrastAdjustment;
-        //        SetProcAmpProperty("Contrast", contrastAdjustment);
-        //    }
-        //}
-
-        //private void UpdateWhiteBalance(int red, int green, int blue)
-        //{
-        //    // Ищем отклонение каналов от среднего значения
-        //    int average = (red + green + blue) / 3;
-        //    int deltaRed = red - average;
-        //    int deltaBlue = blue - average;
-
-        //    // Вычисляем коррекцию WhiteBalance на основе отклонений (примерно)
-        //    int whiteBalanceCorrection = 4000 + deltaBlue * 10 - deltaRed * 10;
-
-        //    // Ограничиваем диапазон допустимых значений
-        //    whiteBalanceCorrection = Math.Clamp(whiteBalanceCorrection, 2800, 6500);
-
-        //    // Применяем новый баланс белого
-        //    SetProcAmpProperty("WhiteBalance", whiteBalanceCorrection);
-        //}
 
         private void UpdateHue(int red, int green, int blue)
         {
@@ -426,37 +267,28 @@ namespace CameraExample
 
         #region Frame (markers) analysis
 
-        //private static (string Red, string Green, string Blue) AnalyzeMarkers(Bitmap frame)
-        //{
-        //    return (
-        //        GetMarkerColorAndBrightness(frame, new System.Drawing.Point(50, 50), 20),
-        //        GetMarkerColorAndBrightness(frame, new System.Drawing.Point(frame.Width - 50, 50), 20),
-        //        GetMarkerColorAndBrightness(frame, new System.Drawing.Point(frame.Width / 2, frame.Height - 50), 20)
-        //    );
-        //}
-
-
-
-        //private static (string Color, int Brightness) AnalyzeMarkers(Bitmap frame)
-        //{
-        //    // Анализируем цвет маркера в заданной позиции
-        //    var markerData = GetMarkerColor(frame, new System.Drawing.Point(50, 50), 20);
-        //    Console.WriteLine($"Marker Color: {markerData.Color}, Brightness: {markerData.Brightness}");
-        //    return markerData;
-        //}
-
-
-    private static (string Color, int Brightness) GetMarkerColor(Bitmap frame, System.Drawing.Point position, int size)
+        private static (string Color, int Brightness) GetMarkerColor(Bitmap frame, System.Drawing.Point position, int size)
         {
             int totalR = 0, totalG = 0, totalB = 0, pixelCount = 0;
             int halfSize = size / 2;
+
+            // Зоны исключения для анализа
+            var exclusionZones = new List<Rectangle>
+    {
+        new Rectangle(40, 40, 20, 20),
+        new Rectangle(frame.Width - 60, 40, 20, 20),
+        new Rectangle(frame.Width / 2 - 10, frame.Height - 60, 20, 20)
+    };
 
             for (int y = Math.Max(0, position.Y - halfSize); y < Math.Min(frame.Height, position.Y + halfSize); y++)
             {
                 for (int x = Math.Max(0, position.X - halfSize); x < Math.Min(frame.Width, position.X + halfSize); x++)
                 {
-                    Color pixel = frame.GetPixel(x, y);
+                    var pixelPos = new System.Drawing.Point(x, y);
+                    if (exclusionZones.Exists(zone => zone.Contains(pixelPos)))
+                        continue; // Игнорируем пиксель, если он находится в зоне исключения
 
+                    Color pixel = frame.GetPixel(x, y);
                     totalR += pixel.R;
                     totalG += pixel.G;
                     totalB += pixel.B;
@@ -464,27 +296,22 @@ namespace CameraExample
                 }
             }
 
-            //if (pixelCount == 0) return "Unknown";
+            if (pixelCount == 0)
+                return ("Unknown", 0); // Если нет пикселей для анализа
 
             // Рассчитываем средние значения
             int avgR = totalR / pixelCount;
             int avgG = totalG / pixelCount;
             int avgB = totalB / pixelCount;
 
-            //Console.WriteLine($"Average R={avgR}, G={avgG}, B={avgB}");
-
             // Определение цвета на основе RGB
             if (avgR > avgG && avgR > avgB) return ("Red", avgR);
             if (avgG > avgR && avgG > avgB) return ("Green", avgG);
             if (avgB > avgR && avgB > avgG) return ("Blue", avgB);
 
-            // Если не удалось явно определить цвет
-            //return "Unknown";
             return ("Unknown", 0);
         }
-
         #endregion
-
 
         #region Static methods (calculations)
 
@@ -527,43 +354,6 @@ namespace CameraExample
             // Ограничиваем диапазон
             return Math.Clamp(newContrast, 0, 100);
         }
-
-        //private static int CalculateHueAdjustment(int redMarker, int greenMarker, int blueMarker)
-        //{
-        //    // Идеальные значения цветов маркеров
-        //    const int IdealRed = 255;
-        //    const int IdealGreen = 255;
-        //    const int IdealBlue = 255;
-
-        //    // Расчет среднего отклонения цветов
-        //    int redDelta = Math.Abs(IdealRed - redMarker);
-        //    int greenDelta = Math.Abs(IdealGreen - greenMarker);
-        //    int blueDelta = Math.Abs(IdealBlue - blueMarker);
-
-        //    // Определение общей корректировки оттенка (эмпирическое значение)
-        //    int hueAdjustment = (redDelta - greenDelta + blueDelta) / 3;
-
-        //    // Возврат ограниченной корректировки
-        //    return Math.Clamp(hueAdjustment, -30, 30); // Диапазон корректировки Hue
-        //}
-
-        //private static int CalculateContrastAdjustment(int redMarker, int greenMarker, int blueMarker, int currentContrast)
-        //{
-        //    // Рассчитать разброс яркости
-        //    int minColor = Math.Min(redMarker, Math.Min(greenMarker, blueMarker));
-        //    int maxColor = Math.Max(redMarker, Math.Max(greenMarker, blueMarker));
-        //    int brightnessRange = maxColor - minColor;
-
-        //    // Определить идеальный контраст для текущего разброса
-        //    int idealContrast = brightnessRange < TargetBrightnessMin ? 80 : (brightnessRange > TargetBrightnessMax ? 50 : 65);
-
-        //    // Плавно скорректировать контраст к целевому значению
-        //    int newContrast = currentContrast + (idealContrast - currentContrast) / 4;
-
-        //    // Ограничить диапазон контраста
-        //    return Math.Clamp(newContrast, 0, 100);
-
-        //}
 
         #endregion
 
@@ -610,31 +400,22 @@ namespace CameraExample
 
         private static Bitmap AddColorMarkers(Bitmap frame)
         {
-            //using Graphics g = Graphics.FromImage(frame);
-            //int markerSize = 20;
-            //g.FillEllipse(Brushes.Red, 40, 40, markerSize, markerSize);
-            //g.FillEllipse(Brushes.Green, frame.Width - 60, 40, markerSize, markerSize);
-            //g.FillEllipse(Brushes.Blue, frame.Width / 2 - 10, frame.Height - 60, markerSize, markerSize);
+            using Graphics g = Graphics.FromImage(frame);
+            int markerSize = 20;
+
+            // Координаты маркеров
+            var redMarkerRect = new Rectangle(40, 40, markerSize, markerSize);
+            var greenMarkerRect = new Rectangle(frame.Width - 60, 40, markerSize, markerSize);
+            var blueMarkerRect = new Rectangle(frame.Width / 2 - 10, frame.Height - 60, markerSize, markerSize);
+
+            // Рисуем маркеры
+            g.FillEllipse(Brushes.Red, redMarkerRect);
+            g.FillEllipse(Brushes.Green, greenMarkerRect);
+            g.FillEllipse(Brushes.Blue, blueMarkerRect);
+
+            // Возвращаем кадр с маркерами
             return frame;
         }
-
-        //private static Bitmap AddColorMarkers(Bitmap frame)
-        //{
-        //    using Graphics g = Graphics.FromImage(frame);
-        //    int markerSize = 20;
-
-        //    // Добавление кругов в качестве визуальных подсказок
-        //    g.FillEllipse(Brushes.Red, 40, 40, markerSize, markerSize); // Красная подсказка
-        //    g.FillEllipse(Brushes.Green, frame.Width - 60, 40, markerSize, markerSize); // Зелёная подсказка
-        //    g.FillEllipse(Brushes.Blue, frame.Width / 2 - 10, frame.Height - 60, markerSize, markerSize); // Синяя подсказка
-
-        //    // Подпись для визуальных маркеров
-        //    g.DrawString("Guide Marker", new Font("Arial", 10), Brushes.Black, 40, 40 + markerSize);
-        //    g.DrawString("Guide Marker", new Font("Arial", 10), Brushes.Black, frame.Width - 60, 40 + markerSize);
-        //    g.DrawString("Guide Marker", new Font("Arial", 10), Brushes.Black, frame.Width / 2 - 10, frame.Height - 60 + markerSize);
-
-        //    return frame;
-        //}
 
         private void UpdateImage()
         {
