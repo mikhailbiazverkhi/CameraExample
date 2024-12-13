@@ -1,15 +1,19 @@
-﻿using CameraExample.Core;
+﻿using CameraExample.Config;
+using CameraExample.Core;
 using CameraExample.Settings;
-using IniParser;
-using IniParser.Model;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+//using System.Windows.Shapes;
 using System.Windows.Threading;
 using UMapx.Video;
 using UMapx.Video.DirectShow;
+using UMapx.Window;
 
 namespace CameraExample
 {
@@ -22,7 +26,7 @@ namespace CameraExample
 
         private readonly IVideoSource _videoSource;
         private static readonly object _locker = new();
-        private CameraSettings _cameraSettings;
+        private CameraSettings _cameraSettingsFromConfig, _cameraSettingsFromDriver;
         private Bitmap _frame;
 
         private int _currentExposure = -3; // Подходит для большинства стандартных условий
@@ -33,8 +37,11 @@ namespace CameraExample
         private int _currentHue = 0;              // Нейтральный оттенок
         private int _currentWhiteBalance = 4500; // Нейтральная цветовая температура
 
-        private System.Drawing.Point _redMarkerPosition, _greenMarkerPosition, _blueMarkerPosition;
-        int indicatorSize; // Размер цветовой точки места установки маркера
+        //from config
+        string iniFilePath = Path.Combine(AppContext.BaseDirectory, "CameraConfig.ini"); //путь конфиг файла
+        private System.Drawing.Point _redMarkerPositionFromConfig, _greenMarkerPositionFromConfig, _blueMarkerPositionFromConfig;
+        int indicatorSizeFromConfig; // Размер цветовой точки места установки маркера
+        
 
         #endregion
 
@@ -48,11 +55,11 @@ namespace CameraExample
             InitializeComponent();
             Closing += MainWindow_Closing;
 
-            //InitializeCameraSettings();
-            string iniFilePath = "settings.ini"; // Путь к вашему INI-файлу C:\GitHub_repos\CameraExample\bin\Debug\net8.0-windows\settings.ini
-            LoadCameraSettingsFromIni(iniFilePath);
+            LoadCameraSettings(iniFilePath);
+            LoadIndicatorSettings(iniFilePath);
 
-            _videoSource = VideoSourceUtils.GetVideoDevice(_cameraSettings);
+            _videoSource = VideoSourceUtils.GetVideoDevice(_cameraSettingsFromConfig);
+            //_cameraSettingsFromDriver = VideoSourceUtils.GetCameraSettingsFromDevice(_cameraSettingsFromConfig.CameraId);
 
             if (_videoSource != null)
             {
@@ -66,74 +73,182 @@ namespace CameraExample
 
         #endregion
 
-        #region Camera Settings
+        #region Camera and Markers Settings (config file)
 
-        private void LoadCameraSettingsFromIni(string filePath)
+        private void LoadCameraSettings(string filePath)
         {
-            var parser = new FileIniDataParser();
-            IniData iniData = parser.ReadFile(filePath);
+            var ini = new IniFile(filePath);
 
-            //Путь к конфигурационному INI-файлу C:\GitHub_repos\CameraExample\bin\Debug\net8.0 - windows\settings.ini
-            _cameraSettings = new CameraSettings
+            _cameraSettingsFromConfig = new CameraSettings
             {
-                CameraId = int.Parse(iniData["CameraSettings"]["CameraId"]),
-                ResolutionId = int.Parse(iniData["CameraSettings"]["ResolutionId"]),
+                CameraId = int.Parse(ini.Read("Camera", "CameraId", "1")),
+                ResolutionId = int.Parse(ini.Read("Camera", "ResolutionId", "0")),
+
                 CameraControlPropertySettings = new List<CameraControlPropertySettings>
-        {
-            new CameraControlPropertySettings
-            {
-                CameraControlProperty = "Exposure",
-                Value = int.Parse(iniData["CameraControlPropertySettings"]["Exposure"]),
-                CameraControlFlag = iniData["CameraControlPropertySettings"]["ExposureFlag"]
-            }
-        },
+                {
+                    new CameraControlPropertySettings
+                    {
+                        CameraControlProperty = ini.Read("Exposure", "CameraControlProperty", "Exposure"),
+                        Value = int.Parse(ini.Read("Exposure", "Value", "0")),
+                        CameraControlFlag = ini.Read("Exposure", "CameraControlFlag", "None")
+                    }
+                },
                 CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings>
-        {
-            new CameraProcAmpPropertySettings
-            {
-                VideoProcAmpProperty = "Brightness",
-                Value = int.Parse(iniData["CameraProcAmpPropertySettings"]["Brightness"]),
-                VideoProcAmpFlag = iniData["CameraProcAmpPropertySettings"]["BrightnessFlag"]
-            },
-            new CameraProcAmpPropertySettings
-            {
-                VideoProcAmpProperty = "Hue",
-                Value = int.Parse(iniData["CameraProcAmpPropertySettings"]["Hue"]),
-                VideoProcAmpFlag = iniData["CameraProcAmpPropertySettings"]["HueFlag"]
-            },
-            new CameraProcAmpPropertySettings
-            {
-                VideoProcAmpProperty = "Contrast",
-                Value = int.Parse(iniData["CameraProcAmpPropertySettings"]["Contrast"]),
-                VideoProcAmpFlag = iniData["CameraProcAmpPropertySettings"]["ContrastFlag"]
-            },
-            new CameraProcAmpPropertySettings
-            {
-                VideoProcAmpProperty = "WhiteBalance",
-                Value = int.Parse(iniData["CameraProcAmpPropertySettings"]["WhiteBalance"]),
-                VideoProcAmpFlag = iniData["CameraProcAmpPropertySettings"]["WhiteBalanceFlag"]
-            }
-        }
+                {
+                    new CameraProcAmpPropertySettings
+                    {
+                        VideoProcAmpProperty = ini.Read("Brightness", "VideoProcAmpProperty", "Brightness"),
+                        Value = int.Parse(ini.Read("Brightness", "Value", "0")),
+                        VideoProcAmpFlag = ini.Read("Brightness", "VideoProcAmpFlag", "None")
+                    },
+                    new CameraProcAmpPropertySettings
+                    {
+                        VideoProcAmpProperty = ini.Read("Hue", "VideoProcAmpProperty", "Hue"),
+                        Value = int.Parse(ini.Read("Hue", "Value", "0")),
+                        VideoProcAmpFlag = ini.Read("Hue", "VideoProcAmpFlag", "None")
+                    },
+                    new CameraProcAmpPropertySettings
+                    {
+                        VideoProcAmpProperty = ini.Read("Contrast", "VideoProcAmpProperty", "Contrast"),
+                        Value = int.Parse(ini.Read("Contrast", "Value", "0")),
+                        VideoProcAmpFlag = ini.Read("Contrast", "VideoProcAmpFlag", "None")
+                    },
+                    new CameraProcAmpPropertySettings
+                    {
+                        VideoProcAmpProperty = ini.Read("WhiteBalance", "VideoProcAmpProperty", "WhiteBalance"),
+                        Value = int.Parse(ini.Read("WhiteBalance", "Value", "4000")),
+                        VideoProcAmpFlag = ini.Read("WhiteBalance", "VideoProcAmpFlag", "None")
+                    }
+                }
             };
+        }
+
+        private void LoadIndicatorSettings(string filePath)
+        {
+            var ini = new IniFile(filePath);
 
             // Load marker positions
-            _redMarkerPosition = new System.Drawing.Point(
-                int.Parse(iniData["MarkerPositions"]["RedMarkerX"]),
-                int.Parse(iniData["MarkerPositions"]["RedMarkerY"]));
+            _redMarkerPositionFromConfig = new System.Drawing.Point(
+                int.Parse(ini.Read("MarkerPositions", "RedMarkerX", "40")),
+                int.Parse(ini.Read("MarkerPositions", "RedMarkerY", "40")));
 
-            _greenMarkerPosition = new System.Drawing.Point(
-                int.Parse(iniData["MarkerPositions"]["GreenMarkerX"]),
-                int.Parse(iniData["MarkerPositions"]["GreenMarkerY"]));
+            _greenMarkerPositionFromConfig = new System.Drawing.Point(
+                int.Parse(ini.Read("MarkerPositions", "GreenMarkerX", "600")),
+                int.Parse(ini.Read("MarkerPositions", "GreenMarkerY", "40")));
 
-            _blueMarkerPosition = new System.Drawing.Point(
-                int.Parse(iniData["MarkerPositions"]["BlueMarkerX"]),
-                int.Parse(iniData["MarkerPositions"]["BlueMarkerY"]));
+            _blueMarkerPositionFromConfig = new System.Drawing.Point(
+                int.Parse(ini.Read("MarkerPositions", "BlueMarkerX", "300")),
+                int.Parse(ini.Read("MarkerPositions", "BlueMarkerY", "400")));
 
 
-            indicatorSize = int.Parse(iniData["PointerSize"]["IndicatorSize"]);
+            indicatorSizeFromConfig = int.Parse(ini.Read("PointerSize", "IndicatorSize", "20"));
         }
 
+        //private void SaveCameraSettingsToIni(string filePath)
+        //{
+        //    var parser = new FileIniDataParser();
+        //    IniData iniData = new IniData();
 
+        //    // Save camera settings
+        //    iniData["Camera"]["CameraId"] = _cameraSettings.CameraId.ToString();
+        //    iniData["Camera"]["ResolutionId"] = _cameraSettings.ResolutionId.ToString();
+
+        //    // Save camera control properties
+        //    iniData["Exposure"]["CameraControlProperty"] = _cameraSettings.CameraControlPropertySettings[0].CameraControlProperty;
+        //    iniData["Exposure"]["Value"] = _cameraSettings.CameraControlPropertySettings[0].Value.ToString();
+        //    iniData["Exposure"]["CameraControlFlag"] = _cameraSettings.CameraControlPropertySettings[0].CameraControlFlag;
+
+        //    // Save camera proc amp properties
+        //    iniData["Brightness"]["VideoProcAmpProperty"] = _cameraSettings.CameraProcAmpPropertySettings[0].VideoProcAmpProperty;
+        //    iniData["Brightness"]["Value"] = _cameraSettings.CameraProcAmpPropertySettings[0].Value.ToString();
+        //    iniData["Brightness"]["VideoProcAmpFlag"] = _cameraSettings.CameraProcAmpPropertySettings[0].VideoProcAmpFlag;
+
+        //    iniData["Hue"]["VideoProcAmpProperty"] = _cameraSettings.CameraProcAmpPropertySettings[1].VideoProcAmpProperty;
+        //    iniData["Hue"]["Value"] = _cameraSettings.CameraProcAmpPropertySettings[1].Value.ToString();
+        //    iniData["Hue"]["VideoProcAmpFlag"] = _cameraSettings.CameraProcAmpPropertySettings[1].VideoProcAmpFlag;
+
+        //    iniData["Contrast"]["VideoProcAmpProperty"] = _cameraSettings.CameraProcAmpPropertySettings[2].VideoProcAmpProperty;
+        //    iniData["Contrast"]["Value"] = _cameraSettings.CameraProcAmpPropertySettings[2].Value.ToString();
+        //    iniData["Contrast"]["VideoProcAmpFlag"] = _cameraSettings.CameraProcAmpPropertySettings[2].VideoProcAmpFlag;
+
+        //    iniData["WhiteBalance"]["VideoProcAmpProperty"] = _cameraSettings.CameraProcAmpPropertySettings[3].VideoProcAmpProperty;
+        //    iniData["WhiteBalance"]["Value"] = _cameraSettings.CameraProcAmpPropertySettings[3].Value.ToString();
+        //    iniData["WhiteBalance"]["VideoProcAmpFlag"] = _cameraSettings.CameraProcAmpPropertySettings[3].VideoProcAmpFlag;
+
+        //    // Save marker positions
+        //    iniData["MarkerPositions"]["RedMarkerX"] = _redMarkerPosition.X.ToString();
+        //    iniData["MarkerPositions"]["RedMarkerY"] = _redMarkerPosition.Y.ToString();
+        //    iniData["MarkerPositions"]["GreenMarkerX"] = _greenMarkerPosition.X.ToString();
+        //    iniData["MarkerPositions"]["GreenMarkerY"] = _greenMarkerPosition.Y.ToString();
+        //    iniData["MarkerPositions"]["BlueMarkerX"] = _blueMarkerPosition.X.ToString();
+        //    iniData["MarkerPositions"]["BlueMarkerY"] = _blueMarkerPosition.Y.ToString();
+
+        //    // Save pointer size
+        //    iniData["PointerSize"]["IndicatorSize"] = indicatorSize.ToString();
+
+        //    // Write to file
+        //    parser.WriteFile(filePath, iniData);
+        //}
+
+        //private void SaveCameraSettingsToIni(string filePath)
+        //{
+        //    // Используем StringBuilder для создания содержимого INI-файла
+        //    var iniContent = new StringBuilder();
+
+        //    // Сохранение настроек камеры
+        //    iniContent.AppendLine("[Camera]");
+        //    iniContent.AppendLine($"CameraId={_cameraSettingsFromConfig.CameraId}");
+        //    iniContent.AppendLine($"ResolutionId={_cameraSettingsFromConfig.ResolutionId}");
+
+        //    // Сохранение свойств управления камерой
+        //    iniContent.AppendLine("[Exposure]");
+        //    iniContent.AppendLine($"CameraControlProperty={_cameraSettingsFromDriver.CameraControlPropertySettings[1].CameraControlProperty}");
+        //    iniContent.AppendLine($"Value={_cameraSettingsFromDriver.CameraControlPropertySettings[1].Value}");
+        //    iniContent.AppendLine($"CameraControlFlag={_cameraSettingsFromDriver.CameraControlPropertySettings[1].CameraControlFlag}");
+
+           
+
+        //    // Сохранение свойств ProcAmp камеры (настройки изображения)
+        //    iniContent.AppendLine("[Brightness]");
+        //    iniContent.AppendLine($"VideoProcAmpProperty={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[0].VideoProcAmpProperty}");
+        //    iniContent.AppendLine($"Value={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[0].Value}");
+        //    iniContent.AppendLine($"VideoProcAmpFlag={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[0].VideoProcAmpFlag}");
+
+        //    iniContent.AppendLine("[Hue]");
+        //    iniContent.AppendLine($"VideoProcAmpProperty={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[2].VideoProcAmpProperty}");
+        //    iniContent.AppendLine($"Value={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[2].Value}");
+        //    iniContent.AppendLine($"VideoProcAmpFlag={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[2].VideoProcAmpFlag}");
+
+        //    iniContent.AppendLine("[Contrast]");
+        //    iniContent.AppendLine($"VideoProcAmpProperty={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[1].VideoProcAmpProperty}");
+        //    iniContent.AppendLine($"Value={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[1].Value}");
+        //    iniContent.AppendLine($"VideoProcAmpFlag={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[1].VideoProcAmpFlag}");
+
+        //    iniContent.AppendLine("[WhiteBalance]");
+        //    iniContent.AppendLine($"VideoProcAmpProperty={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[6].VideoProcAmpProperty}");
+        //    iniContent.AppendLine($"Value={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[6].Value}");
+        //    iniContent.AppendLine($"VideoProcAmpFlag={_cameraSettingsFromDriver.CameraProcAmpPropertySettings[6].VideoProcAmpFlag}");
+
+        //    // Сохранение позиций маркеров
+        //    iniContent.AppendLine("[MarkerPositions]");
+        //    iniContent.AppendLine($"RedMarkerX={_redMarkerPositionFromConfig.X}");
+        //    iniContent.AppendLine($"RedMarkerY={_redMarkerPositionFromConfig.Y}");
+        //    iniContent.AppendLine($"GreenMarkerX={_greenMarkerPositionFromConfig.X}");
+        //    iniContent.AppendLine($"GreenMarkerY={_greenMarkerPositionFromConfig.Y}");
+        //    iniContent.AppendLine($"BlueMarkerX={_blueMarkerPositionFromConfig.X}");
+        //    iniContent.AppendLine($"BlueMarkerY={_blueMarkerPositionFromConfig.Y}");
+
+        //    // Сохранение размера указателя
+        //    iniContent.AppendLine("[PointerSize]");
+        //    iniContent.AppendLine($"IndicatorSize={indicatorSizeFromConfig}");
+
+        //    // Запись в файл
+        //    File.WriteAllText(filePath, iniContent.ToString());
+        //}
+
+        #endregion
+
+        #region Update Camera Settings
 
         private async Task UpdateCameraSettingsAsync()
         {
@@ -145,17 +260,17 @@ namespace CameraExample
                 // Определение зон исключения
                 var exclusionZones = new List<Rectangle>
                 {
-                    new Rectangle(_redMarkerPosition.X - indicatorSize / 2, _redMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
-                    new Rectangle(_greenMarkerPosition.X - indicatorSize / 2, _greenMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
-                    new Rectangle(_blueMarkerPosition.X - indicatorSize / 2, _blueMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize)
+                    new Rectangle(_redMarkerPositionFromConfig.X - indicatorSizeFromConfig / 2, _redMarkerPositionFromConfig.Y - indicatorSizeFromConfig / 2, indicatorSizeFromConfig, indicatorSizeFromConfig),
+                    new Rectangle(_greenMarkerPositionFromConfig.X - indicatorSizeFromConfig / 2, _greenMarkerPositionFromConfig.Y - indicatorSizeFromConfig / 2, indicatorSizeFromConfig, indicatorSizeFromConfig),
+                    new Rectangle(_blueMarkerPositionFromConfig.X - indicatorSizeFromConfig / 2, _blueMarkerPositionFromConfig.Y - indicatorSizeFromConfig / 2, indicatorSizeFromConfig, indicatorSizeFromConfig)
                 };
 
                 // Анализируем цвет бублика в заданной позиции
-                var redMarkerData = GetMarkerColor(frame, _redMarkerPosition, indicatorSize + 30, exclusionZones);
+                var redMarkerData = GetMarkerColor(frame, _redMarkerPositionFromConfig, indicatorSizeFromConfig + 30, exclusionZones);
                 Console.WriteLine($"red Marker Color: {redMarkerData.Color}, Brightness: {redMarkerData.Brightness}");
-                var greenMarkerData = GetMarkerColor(frame, _greenMarkerPosition, indicatorSize + 30, exclusionZones);
+                var greenMarkerData = GetMarkerColor(frame, _greenMarkerPositionFromConfig, indicatorSizeFromConfig + 30, exclusionZones);
                 Console.WriteLine($"green Marker Color: {greenMarkerData.Color}, Brightness: {greenMarkerData.Brightness}");
-                var blueMarkerData = GetMarkerColor(frame, _blueMarkerPosition, indicatorSize + 30, exclusionZones);
+                var blueMarkerData = GetMarkerColor(frame, _blueMarkerPositionFromConfig, indicatorSizeFromConfig + 30, exclusionZones);
                 Console.WriteLine($"blue Marker Color: {blueMarkerData.Color}, Brightness: {blueMarkerData.Brightness}");            
 
                 lock (_locker)
@@ -325,50 +440,6 @@ namespace CameraExample
             return ("Unknown", 0);
         }
 
-        //    private static (string Color, int Brightness) GetMarkerColor(Bitmap frame, System.Drawing.Point position, int size)
-        //    {
-        //        int totalR = 0, totalG = 0, totalB = 0, pixelCount = 0;
-        //        int halfSize = size / 2;
-
-        //        // Зоны исключения для анализа
-        //        var exclusionZones = new List<Rectangle>
-        //{
-        //    new Rectangle(40, 40, 20, 20),
-        //    new Rectangle(frame.Width - 60, 40, 20, 20),
-        //    new Rectangle(frame.Width / 2 - 10, frame.Height - 60, 20, 20)
-        //};
-
-        //        for (int y = Math.Max(0, position.Y - halfSize); y < Math.Min(frame.Height, position.Y + halfSize); y++)
-        //        {
-        //            for (int x = Math.Max(0, position.X - halfSize); x < Math.Min(frame.Width, position.X + halfSize); x++)
-        //            {
-        //                var pixelPos = new System.Drawing.Point(x, y);
-        //                if (exclusionZones.Exists(zone => zone.Contains(pixelPos)))
-        //                    continue; // Игнорируем пиксель, если он находится в зоне исключения
-
-        //                Color pixel = frame.GetPixel(x, y);
-        //                totalR += pixel.R;
-        //                totalG += pixel.G;
-        //                totalB += pixel.B;
-        //                pixelCount++;
-        //            }
-        //        }
-
-        //        if (pixelCount == 0)
-        //            return ("Unknown", 0); // Если нет пикселей для анализа
-
-        //        // Рассчитываем средние значения
-        //        int avgR = totalR / pixelCount;
-        //        int avgG = totalG / pixelCount;
-        //        int avgB = totalB / pixelCount;
-
-        //        // Определение цвета на основе RGB
-        //        if (avgR > avgG && avgR > avgB) return ("Red", avgR);
-        //        if (avgG > avgR && avgG > avgB) return ("Green", avgG);
-        //        if (avgB > avgR && avgB > avgG) return ("Blue", avgB);
-
-        //        return ("Unknown", 0);
-        //    }
         #endregion
 
         #region Static methods (calculations)
@@ -446,7 +517,7 @@ namespace CameraExample
             try
             {
                 Bitmap frame = (Bitmap)eventArgs.Frame.Clone();
-                Frame = AddColorMarkers(frame, _redMarkerPosition, _greenMarkerPosition, _blueMarkerPosition, indicatorSize);
+                Frame = AddColorMarkers(frame, _redMarkerPositionFromConfig, _greenMarkerPositionFromConfig, _blueMarkerPositionFromConfig, indicatorSizeFromConfig);
                 UpdateImage();
             }
             catch (Exception ex)
@@ -498,6 +569,8 @@ namespace CameraExample
         {
             _videoSource?.SignalToStop();
             _videoSource?.WaitForStop();
+            // Save the settings to the INI file after updating
+            //SaveCameraSettingsToIni(iniFilePath);
             Dispose();
             Console.WriteLine("Video source has been successfully stopped");
         }
