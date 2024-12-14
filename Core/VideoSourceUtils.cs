@@ -109,79 +109,79 @@ namespace CameraExample.Core
             }
         }
 
-        ///// <summary>
-        ///// Retrieves current camera settings from the device.
-        ///// </summary>
-        ///// <param name="cameraId">Camera index</param>
-        ///// <returns>CameraSettings</returns>
-        //public static CameraSettings GetCameraSettingsFromDevice(int cameraId)
-        //{
-        //    try
-        //    {
-        //        // Enumerate camera devices
-        //        var videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
-        //        if (cameraId >= videoDevices.Count)
-        //        {
-        //            throw new ArgumentOutOfRangeException(nameof(cameraId), "Invalid camera index.");
-        //        }
+        /// <summary>
+        /// Retrieves current camera settings from the device.
+        /// </summary>
+        /// <param name="cameraId">Camera index</param>
+        /// <returns>CameraSettings</returns>
+        public static CameraSettings GetCameraSettingsFromDevice(int cameraId)
+        {
+            try
+            {
+                // Enumerate camera devices
+                var videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                if (cameraId >= videoDevices.Count)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(cameraId), "Invalid camera index.");
+                }
 
-        //        // Select the device
-        //        var videoDevice = new VideoCaptureDevice(videoDevices[cameraId].MonikerString);
+                // Select the device
+                var videoDevice = new VideoCaptureDevice(videoDevices[cameraId].MonikerString);
 
-        //        // Create CameraSettings object
-        //        var cameraSettings = new CameraSettings
-        //        {
-        //            CameraId = cameraId,
-        //            MonikerString = videoDevices[cameraId].MonikerString,
-        //            CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings>(),
-        //            CameraControlPropertySettings = new List<CameraControlPropertySettings>()
-        //        };
+                // Create CameraSettings object
+                var cameraSettings = new CameraSettings
+                {
+                    CameraId = cameraId,
+                    MonikerString = videoDevices[cameraId].MonikerString,
+                    CameraProcAmpPropertySettings = new List<CameraProcAmpPropertySettings>(),
+                    CameraControlPropertySettings = new List<CameraControlPropertySettings>()
+                };
 
-        //        // Retrieve CameraControl properties
-        //        foreach (CameraControlProperty property in Enum.GetValues(typeof(CameraControlProperty)))
-        //        {
-        //            int value = 0;
-        //            CameraControlFlags flag = 0;
+                // Retrieve CameraControl properties
+                foreach (CameraControlProperty property in Enum.GetValues(typeof(CameraControlProperty)))
+                {
+                    int value = 0;
+                    CameraControlFlags flag = 0;
 
-        //            if (videoDevice.GetCameraProperty(property, out value, out flag))
-        //            {
-        //                cameraSettings.CameraControlPropertySettings.Add(new CameraControlPropertySettings
-        //                {
-        //                    CameraControlProperty = property.ToString(),
-        //                    Value = value,
-        //                    CameraControlFlag = flag.ToString()
-        //                });
-        //            }
-        //        }
+                    if (videoDevice.GetCameraProperty(property, out value, out flag))
+                    {
+                        cameraSettings.CameraControlPropertySettings.Add(new CameraControlPropertySettings
+                        {
+                            CameraControlProperty = property.ToString(),
+                            Value = value,
+                            CameraControlFlag = flag.ToString()
+                        });
+                    }
+                }
 
-        //        // Retrieve VideoProcAmp properties
-        //        foreach (VideoProcAmpProperty property in Enum.GetValues(typeof(VideoProcAmpProperty)))
-        //        {
-        //            int value = 0;
-        //            VideoProcAmpFlags flag = 0;
+                // Retrieve VideoProcAmp properties
+                foreach (VideoProcAmpProperty property in Enum.GetValues(typeof(VideoProcAmpProperty)))
+                {
+                    int value = 0;
+                    VideoProcAmpFlags flag = 0;
 
-        //            if (videoDevice.GetVideoProcAmpProperty(property, out value, out flag))
-        //            {
-        //                cameraSettings.CameraProcAmpPropertySettings.Add(new CameraProcAmpPropertySettings
-        //                {
-        //                    VideoProcAmpProperty = property.ToString(),
-        //                    Value = value,
-        //                    VideoProcAmpFlag = flag.ToString()
-        //                });
-        //            }
-        //        }
+                    if (videoDevice.GetVideoProcAmpProperty(property, out value, out flag))
+                    {
+                        cameraSettings.CameraProcAmpPropertySettings.Add(new CameraProcAmpPropertySettings
+                        {
+                            VideoProcAmpProperty = property.ToString(),
+                            Value = value,
+                            VideoProcAmpFlag = flag.ToString()
+                        });
+                    }
+                }
 
-        //        // Retrieve resolution settings
-        //        var videoCapabilities = videoDevice.VideoCapabilities;
-        //        cameraSettings.ResolutionId = Array.IndexOf(videoCapabilities, videoDevice.VideoResolution);
+                // Retrieve resolution settings
+                var videoCapabilities = videoDevice.VideoCapabilities;
+                cameraSettings.ResolutionId = Array.IndexOf(videoCapabilities, videoDevice.VideoResolution);
 
-        //        return cameraSettings;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine($"Error retrieving camera settings: {ex.Message}");
-        //        return null;
-        //    }
-        //}
+                return cameraSettings;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error retrieving camera settings: {ex.Message}");
+                return null;
+            }
+        }
     }
 }
