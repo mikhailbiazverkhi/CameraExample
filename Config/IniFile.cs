@@ -16,7 +16,8 @@ namespace CameraExample.Config
         {
             if (!File.Exists(_path))
             {
-                throw new FileNotFoundException($"INI file not found at {_path}");
+                //throw new FileNotFoundException($"INI file not found at {_path}");
+                File.Create(_path).Dispose(); // Создаем пустой файл и освобождаем ресурс
             }
 
             var lines = File.ReadAllLines(_path);

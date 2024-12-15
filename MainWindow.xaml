@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CameraExample"
         mc:Ignorable="d"
-        Title="CameraExample" Height="450" Width="800">
-        <Image x:Name="imgColor"/>
+        Title="CameraExample" Height="450" Width="800"
+        KeyDown="Window_KeyDown">
+    <Image x:Name="imgColor"/>
 </Window>

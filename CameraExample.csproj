@@ -29,10 +29,4 @@
 		<RuntimeHostConfigurationOption Include="System.Runtime.Loader.UseRidGraph" Value="true" />
 	</ItemGroup>
 
-	<ItemGroup>
-	  <None Update="Config\CameraConfig.ini">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	</ItemGroup>
-
 </Project>
