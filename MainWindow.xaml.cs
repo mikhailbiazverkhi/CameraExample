@@ -6,12 +6,17 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Xml.Linq;
+using UMapx.Distribution;
 using UMapx.Imaging;
 using UMapx.Video;
 using UMapx.Video.DirectShow;
@@ -32,25 +37,33 @@ namespace CameraExample
         private CameraSettings _cameraSettings;
         private Bitmap _frame;
 
-        //private int _currentExposure = -3; // Подходит для большинства стандартных условий
-        private int _currentExposure; // Подходит для большинства стандартных условий
-        //private int _currentBrightness = 8; // Лёгкая компенсация для большинства камер
-        private int _currentBrightness, currentBrightness; // Лёгкая компенсация для большинства камер
-        //private const int TargetBrightnessMin = 100; // Минимальная целевая яркость
-        //private const int TargetBrightnessMax = 150; // Максимальная целевая яркость
-        //private int _currentContrast = 50; // Нейтральное значение для большинства случаев
-        private int _currentContrast; // Нейтральное значение для большинства случаев
-        //private int _currentHue = 0;              // Нейтральный оттенок
+        ////private int _currentExposure = -3; // Подходит для большинства стандартных условий
+        //private int _currentExposure; // Подходит для большинства стандартных условий
+        ////private int _currentBrightness = 8; // Лёгкая компенсация для большинства камер
+        //private int _currentBrightness, currentBrightness; // Лёгкая компенсация для большинства камер
+        ////private const int TargetBrightnessMin = 100; // Минимальная целевая яркость
+        ////private const int TargetBrightnessMax = 150; // Максимальная целевая яркость
+        ////private int _currentContrast = 50; // Нейтральное значение для большинства случаев
+        //private int _currentContrast; // Нейтральное значение для большинства случаев
+        ////private int _currentHue = 0;              // Нейтральный оттенок
         private int _currentHue;              // Нейтральный оттенок
-        //private int _currentWhiteBalance = 4500; // Нейтральная цветовая температура
-        private int _currentWhiteBalance; // Нейтральная цветовая температура
+        ////private int _currentWhiteBalance = 4500; // Нейтральная цветовая температура
+        //private int _currentWhiteBalance; // Нейтральная цветовая температура
 
-
+        private IniFile ini;
+        private int targetExposure;
+        private int targetBrightness;
+        private int targetHue;
+        private int targetContrast;
+        private int targetWhiteBalance;
+        private int targetSaturation;
 
         //from config
-        string iniFilePath = Path.Combine(AppContext.BaseDirectory, "CameraConfig.ini"); //путь конфиг файла
+        private string iniFilePath = Path.Combine(AppContext.BaseDirectory, "CameraConfig.ini"); //путь конфиг файла
         private System.Drawing.Point _redMarkerPosition, _greenMarkerPosition, _blueMarkerPosition;
-        int indicatorSize; // Размер цветовой точки места установки маркера
+        private int indicatorSize; // Размер цветовой точки места установки маркера
+
+
 
 
         #endregion
@@ -78,6 +91,15 @@ namespace CameraExample
                 _videoSource.Start();
                 Console.WriteLine("Video source has been successfully started");
             }
+
+            // Получаем текущее значение экспозиции
+            ini = new IniFile(iniFilePath);
+            targetExposure = int.Parse(ini.Read("Exposure", "Value")); // Целевое значение из конфигурации
+            targetBrightness = int.Parse(ini.Read("Brightness", "Value")); // Целевое значение из конфигурации
+            targetHue = int.Parse(ini.Read("Hue", "Value")); // Целевое значение из конфигурации
+            targetContrast = int.Parse(ini.Read("Contrast", "Value")); // Целевое значение из конфигурации
+            targetWhiteBalance = int.Parse(ini.Read("WhiteBalance", "Value")); // Целевое значение из конфигурации
+            targetSaturation = int.Parse(ini.Read("Saturation", "Value")); // Целевое значение из конфигурации
 
             _ = UpdateCameraSettingsAsync();
         }
@@ -179,9 +201,49 @@ namespace CameraExample
             iniContent.AppendLine("[PointerSize]");
             iniContent.AppendLine($"IndicatorSize={indicatorSize}");
 
+            // Сохранение позиций маркеров
+            var redMarkerData = GetMarkerData(_redMarkerPosition);
+            var greenMarkerData = GetMarkerData(_greenMarkerPosition);
+            var blueMarkerData = GetMarkerData(_blueMarkerPosition);
+
+            iniContent.AppendLine("[MarkerParameters]");
+            iniContent.AppendLine($"RedMarkerColor={redMarkerData.Color}");
+            iniContent.AppendLine($"RedMarkerBrightnessR={redMarkerData.BrightnessR}");
+            iniContent.AppendLine($"RedMarkerBrightnessG={redMarkerData.BrightnessG}");
+            iniContent.AppendLine($"RedMarkerBrightnessB={redMarkerData.BrightnessB}");
+
+            iniContent.AppendLine($"GreenMarkerColor={greenMarkerData.Color}");
+            iniContent.AppendLine($"GreenMarkerBrightnessR={greenMarkerData.BrightnessR}");
+            iniContent.AppendLine($"GreenMarkerBrightnessG={greenMarkerData.BrightnessG}");
+            iniContent.AppendLine($"GreenMarkerBrightnessB={greenMarkerData.BrightnessB}");
+
+            iniContent.AppendLine($"BlueMarkerColor={blueMarkerData.Color}");
+            iniContent.AppendLine($"BlueMarkerBrightnessR={blueMarkerData.BrightnessR}");
+            iniContent.AppendLine($"BlueMarkerBrightnessG={blueMarkerData.BrightnessG}");
+            iniContent.AppendLine($"BlueMarkerBrightnessB={blueMarkerData.BrightnessB}");
+
             // Запись в файл
             File.WriteAllText(filePath, iniContent.ToString());
         }
+
+
+        private (string Color, int BrightnessR, int BrightnessG, int BrightnessB) GetMarkerData(System.Drawing.Point position)
+        {
+            using var frame = Frame;
+
+            // Определение зон исключения
+            var exclusionZones = new List<Rectangle>
+                {
+                    new Rectangle(_redMarkerPosition.X - indicatorSize / 2, _redMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
+                    new Rectangle(_greenMarkerPosition.X - indicatorSize / 2, _greenMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
+                    new Rectangle(_blueMarkerPosition.X - indicatorSize / 2, _blueMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize)
+                };
+
+            var markerData = GetMarkerColor(frame, position, indicatorSize + 30, exclusionZones);
+
+            return (markerData);
+        }
+
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
@@ -192,6 +254,8 @@ namespace CameraExample
             }
         }
 
+
+
         #endregion
 
         #region Update Camera Settings
@@ -201,24 +265,27 @@ namespace CameraExample
                 while (true)
                 {
 
-                    using var frame = Frame;
-                    if (frame == null) continue;
+                using var frame = Frame;
+                if (frame == null) continue;
 
-                    // Определение зон исключения
-                    var exclusionZones = new List<Rectangle>
-                {
-                    new Rectangle(_redMarkerPosition.X - indicatorSize / 2, _redMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
-                    new Rectangle(_greenMarkerPosition.X - indicatorSize / 2, _greenMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
-                    new Rectangle(_blueMarkerPosition.X - indicatorSize / 2, _blueMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize)
-                };
+                //    // Определение зон исключения
+                //    var exclusionZones = new List<Rectangle>
+                //{
+                //    new Rectangle(_redMarkerPosition.X - indicatorSize / 2, _redMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
+                //    new Rectangle(_greenMarkerPosition.X - indicatorSize / 2, _greenMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize),
+                //    new Rectangle(_blueMarkerPosition.X - indicatorSize / 2, _blueMarkerPosition.Y - indicatorSize / 2, indicatorSize, indicatorSize)
+                //};
 
-                    // Анализируем цвет бублика в заданной позиции
-                    var redMarkerData = GetMarkerColor(frame, _redMarkerPosition, indicatorSize + 30, exclusionZones);
-                    //Console.WriteLine($"Red Marker Color: {redMarkerData.Color}, BrightnessR: {redMarkerData.BrightnessR}, BrightnessG: {redMarkerData.BrightnessG}, BrightnessB: {redMarkerData.BrightnessB}");
-                    var greenMarkerData = GetMarkerColor(frame, _greenMarkerPosition, indicatorSize + 30, exclusionZones);
-                    //Console.WriteLine($"Green Marker Color: {greenMarkerData.Color}, BrightnessR: {greenMarkerData.BrightnessR}, BrightnessG: {greenMarkerData.BrightnessG}, BrightnessB: {greenMarkerData.BrightnessB}");
-                    var blueMarkerData = GetMarkerColor(frame, _blueMarkerPosition, indicatorSize + 30, exclusionZones);
-                    //Console.WriteLine($"Blue Marker Color: {blueMarkerData.Color}, BrightnessR: {blueMarkerData.BrightnessR}, BrightnessG: {blueMarkerData.BrightnessG}, BrightnessB: {blueMarkerData.BrightnessB}");
+                // Анализируем цвет бублика в заданной позиции
+                //var redMarkerData = GetMarkerColor(frame, _redMarkerPosition, indicatorSize + 30, exclusionZones);
+                var redMarkerData = GetMarkerData(_redMarkerPosition);
+                Console.WriteLine($"Red Marker Color: {redMarkerData.Color}, BrightnessR: {redMarkerData.BrightnessR}, BrightnessG: {redMarkerData.BrightnessG}, BrightnessB: {redMarkerData.BrightnessB}");
+                //var greenMarkerData = GetMarkerColor(frame, _greenMarkerPosition, indicatorSize + 30, exclusionZones);
+                var greenMarkerData = GetMarkerData(_greenMarkerPosition);
+                Console.WriteLine($"Green Marker Color: {greenMarkerData.Color}, BrightnessR: {greenMarkerData.BrightnessR}, BrightnessG: {greenMarkerData.BrightnessG}, BrightnessB: {greenMarkerData.BrightnessB}");
+                //var blueMarkerData = GetMarkerColor(frame, _blueMarkerPosition, indicatorSize + 30, exclusionZones);
+                var blueMarkerData = GetMarkerData(_blueMarkerPosition);
+                Console.WriteLine($"Blue Marker Color: {blueMarkerData.Color}, BrightnessR: {blueMarkerData.BrightnessR}, BrightnessG: {blueMarkerData.BrightnessG}, BrightnessB: {blueMarkerData.BrightnessB}");
 
 
                 if (File.Exists(iniFilePath) && new FileInfo(iniFilePath).Length != 0)
@@ -227,18 +294,25 @@ namespace CameraExample
 
                     lock (_locker)
                     {
+                        UpdateExposure(iniFilePath, redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
+                        greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
+                        blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
 
-                        //UpdateExposure(iniFilePath, redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
-                        //greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
-                        //blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
+                        UpdateBrightness(iniFilePath, redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
+                        greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
+                        blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
 
-                        //UpdateBrightness(iniFilePath, redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
-                        //greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
-                        //blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
+                        UpdateHue(redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
+                        greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
+                        blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
 
-                        //UpdateHue(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
-                        //UpdateWhiteBalance(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
-                        //UpdateContrast(redMarkerData.Brightness, greenMarkerData.Brightness, blueMarkerData.Brightness);
+                        UpdateWhiteBalance(redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
+                        greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
+                        blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
+
+                        UpdateContrast(redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
+                        greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
+                        blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
                     }
 
 
@@ -251,75 +325,65 @@ namespace CameraExample
                     
                 }
         }
-    
 
-        //    private void UpdateExposure(string filePath, int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
-        //{
-        //        var ini = new IniFile(filePath);
-
-        //        // Рассчитываем среднюю яркость по всем маркерам
-        //        int averageBrightness = (
-        //        (redR + redG + redB) +
-        //        (greenR + greenG + greenB) +
-        //        (blueR + blueG + blueB)) / 9;
-
-        //    // Получаем текущие параметры экспозиции и яркости
-        //    int currentExposure = GetCameraProperty("Exposure").value;
-        //    int targetExposure = int.Parse(ini.Read("Exposure", "Value")); // Целевое значение из конфигурации
-
-
-        //    //Обе величины нормализовались в общую шкалу [0, 1]
-        //    double normalizedBrightness = averageBrightness / 255.0;
-        //    double normalizedExposure = (targetExposure + 8) / 8.0;
-
-        //    if (normalizedBrightness < normalizedExposure)
-        //    {
-        //        currentExposure = Math.Clamp(currentExposure + 1, -8, 0);
-        //    }
-        //    else if (normalizedBrightness > normalizedExposure)
-        //    {
-        //        currentExposure = Math.Clamp(currentExposure - 1, -8, 0);
-        //    }
-
-        //    // Устанавливаем новое значение экспозиции
-        //    SetCameraProperty("Exposure", currentExposure);
-        //}
-
-        private double previousBrightness = 0;
-
-        private void UpdateExposure(string filePath, int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
+        private int TargetAverageMarkerBrightness(string filePath)
         {
             var ini = new IniFile(filePath);
 
-            int averageBrightness = (redR + redG + redB + greenR + greenG + greenB + blueR + blueG + blueB) / 9;
+            // Считываем параметры яркости маркеров из файла конфигурации
+            int[] redMarkerBrightness = {
+        int.Parse(ini.Read("MarkerParameters", "RedMarkerBrightnessR")),
+        int.Parse(ini.Read("MarkerParameters", "RedMarkerBrightnessG")),
+        int.Parse(ini.Read("MarkerParameters", "RedMarkerBrightnessB"))
+    };
 
-            // Сглаживание яркости
-            double smoothedBrightness = (previousBrightness * 0.8) + (averageBrightness * 0.2);
-            previousBrightness = smoothedBrightness;
+            int[] greenMarkerBrightness = {
+        int.Parse(ini.Read("MarkerParameters", "GreenMarkerBrightnessR")),
+        int.Parse(ini.Read("MarkerParameters", "GreenMarkerBrightnessG")),
+        int.Parse(ini.Read("MarkerParameters", "GreenMarkerBrightnessB"))
+    };
 
-            double normalizedBrightness = smoothedBrightness / 255.0;
-            double targetExposure = (int.Parse(ini.Read("Exposure", "Value")) + 8) / 8.0;
+            int[] blueMarkerBrightness = {
+        int.Parse(ini.Read("MarkerParameters", "BlueMarkerBrightnessR")),
+        int.Parse(ini.Read("MarkerParameters", "BlueMarkerBrightnessG")),
+        int.Parse(ini.Read("MarkerParameters", "BlueMarkerBrightnessB"))
+    };
 
-            double threshold = 0.05;
-            if (Math.Abs(normalizedBrightness - targetExposure) > threshold)
+            // Рассчитываем целевую среднюю яркость
+            int targetAverageMarkerBrightness = (redMarkerBrightness.Sum() + greenMarkerBrightness.Sum() + blueMarkerBrightness.Sum()) / 9;
+
+            return targetAverageMarkerBrightness;
+        }
+
+        private void UpdateExposure(string filePath, int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
+        {
+            // Рассчитываем среднюю яркость по всем маркерам
+            int currentAverageMarkerBrightness = (redR + redG + redB + greenR + greenG + greenB + blueR + blueG + blueB) / 9;
+
+            int targetAverageMarkerBrightness = TargetAverageMarkerBrightness(filePath);
+
+            Console.WriteLine($"currentAverageMarkerBrightness = {currentAverageMarkerBrightness}");
+            Console.WriteLine($"targetAverageMarkerBrightness = {targetAverageMarkerBrightness}");
+
+            // Задаем порог, чтобы изображение не мигало
+            if (Math.Abs(currentAverageMarkerBrightness - targetAverageMarkerBrightness) > 20) {
+            // Корректируем значение экспозиции
+            if (currentAverageMarkerBrightness < targetAverageMarkerBrightness)
             {
-                int currentExposure = GetCameraProperty("Exposure").value;
-                if (normalizedBrightness < targetExposure)
-                {
-                    currentExposure = Math.Clamp(currentExposure + 1, -8, 0);
-                }
-                else
-                {
-                    currentExposure = Math.Clamp(currentExposure - 1, -8, 0);
-                }
-                SetProcAmpProperty("Exposure", currentExposure);
+                targetExposure = Math.Clamp(targetExposure + 1, -8, 0);
+            }
+            else if (currentAverageMarkerBrightness > targetAverageMarkerBrightness)
+            {
+                targetExposure = Math.Clamp(targetExposure - 1, -8, 0);
             }
         }
 
-        private void UpdateBrightness(string filePath,
-            int redR, int redG, int redB,
-            int greenR, int greenG, int greenB,
-            int blueR, int blueG, int blueB)
+            // Устанавливаем новое значение экспозиции
+            SetCameraProperty("Exposure", targetExposure);
+        }
+
+
+        private void UpdateBrightness(string filePath, int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
         {
             var ini = new IniFile(filePath);
 
@@ -333,133 +397,141 @@ namespace CameraExample
             double weightedBlue = (blueR * redWeight + blueG * greenWeight + blueB * blueWeight) / 3.0;
 
             // Рассчитываем среднюю взвешенную яркость
-            double averageWeightedBrightness = (weightedRed + weightedGreen + weightedBlue) / 3.0;
+            double currentAverageWeightedBrightness = (weightedRed + weightedGreen + weightedBlue) / 3.0;
 
-            // Получаем текущие параметры яркости
-            int currentBrightness = GetProcAmpProperty("Brightness").value;
-            int targetBrightness = int.Parse(ini.Read("Brightness", "Value")); // Целевое значение из конфигурации
-
-            // Нормализуем текущую и целевую яркость для сравнения
-            double normalizedCurrentBrightness = (currentBrightness + 64) * (255.0 / 128.0); // Преобразование из [-64, 64] в [0, 255]
-            double normalizedTargetBrightness = Math.Clamp((targetBrightness + 64) * (255.0 / 128.0), 0.0, 255.0); // Преобразование
+            int targetAverageMarkerBrightness = TargetAverageMarkerBrightness(filePath);
 
             // Оценка отклонения и корректировка яркости
-            if (averageWeightedBrightness < normalizedTargetBrightness)
+            if (currentAverageWeightedBrightness < targetAverageMarkerBrightness)
             {
-                currentBrightness = Math.Clamp(currentBrightness + 8, -64, 64);
+                targetBrightness = Math.Clamp(targetBrightness + 8, -64, 64);
             }
-            else if (averageWeightedBrightness > normalizedTargetBrightness)
+            else if (currentAverageWeightedBrightness > targetAverageMarkerBrightness)
             {
-                currentBrightness = Math.Clamp(currentBrightness - 8, -64, 64);
+                targetBrightness = Math.Clamp(targetBrightness - 8, -64, 64);
             }
 
             // Устанавливаем новое значение яркости
-            SetProcAmpProperty("Brightness", currentBrightness);
+            SetProcAmpProperty("Brightness", targetBrightness);
         }
-    
 
-        //private void UpdateExposure(int red, int green, int blue)
-        //{
-        //    // Рассчитываем среднюю яркость
-        //    int averageBrightness = (red + green + blue) / 3;
-        //    _currentExposure = GetCameraProperty("Exposure").value;
-        //    currentBrightness = GetProcAmpProperty("Brightness").value;
 
-        //    // Оценка отклонения от целевого значения экспозиции
-        //    if (averageBrightness < currentBrightness)
-        //    {
-        //        _currentExposure = Math.Clamp(_currentExposure + 1, -8, 0);
-        //        //currentExposure = Math.Clamp(currentExposure + 1, -8, 0);
-        //    }
-        //    else if (averageBrightness > currentBrightness)
-        //    {
-        //        _currentExposure = Math.Clamp(_currentExposure - 1, -8, 0);
-        //        //currentExposure = Math.Clamp(currentExposure - 1, -8, 0);
-        //    }
-
-        //    // Устанавливаем новое значение экспозиции
-        //    SetCameraProperty("Exposure", _currentExposure);
-        //}
-
-        //private void UpdateBrightness(int red, int green, int blue)
-        //{
-        //    // Расчет коэффициентов для цветовых каналов
-        //    double redWeight = 0.299;
-        //    double greenWeight = 0.587;
-        //    double blueWeight = 0.114;
-
-        //    currentBrightness = GetProcAmpProperty("Brightness").value;
-        //    _currentBrightness = GetProcAmpProperty("Brightness").value;
-
-        //    // Рассчитываем взвешенную яркость
-        //    double weightedBrightness = (red * redWeight + green * greenWeight + blue * blueWeight);
-
-        //    // Оценка отклонения от целевой яркости
-        //    if (weightedBrightness < currentBrightness)
-        //    {
-        //        _currentBrightness = Math.Clamp(_currentBrightness + 8, -64, 64);
-        //    }
-        //    else if (weightedBrightness > currentBrightness)
-        //    {
-        //        _currentBrightness = Math.Clamp(_currentBrightness - 8, -64, 64);
-        //    }
-
-        //    // Устанавливаем новое значение яркости
-        //    SetProcAmpProperty("Brightness", _currentBrightness);
-        //}
-
-        private void UpdateHue(int red, int green, int blue)
+        private void UpdateHue(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
         {
             // Рассчитываем корректировку оттенка (Hue)
-            int hueAdjustment = CalculateHueAdjustment(red, green, blue);
+            int hueAdjustment = CalculateHueAdjustment(redR, redG, redB, greenR, greenG, greenB, blueR, blueG, blueB);
 
-            _currentHue = GetProcAmpProperty("Hue").value;
+            //_currentHue = GetProcAmpProperty("Hue").value;
+
+
 
         // Плавное сглаживание изменений оттенка
-        int smoothedHue = (int)(_currentHue * 0.8 + hueAdjustment * 0.2);
+        int smoothedHue = (int)(targetHue * 0.8 + hueAdjustment * 0.2);
 
             // Применяем значение
-            _currentHue = Math.Clamp(smoothedHue, _currentHue - 10, _currentHue + 10);
-            SetProcAmpProperty("Hue", _currentHue);
+            targetHue = Math.Clamp(smoothedHue, targetHue - 10, targetHue + 10);
+            SetProcAmpProperty("Hue", targetHue);
         }
 
-        private void UpdateContrast(int red, int green, int blue)
+        //private void UpdateContrast(int red, int green, int blue)
+            private void UpdateContrast(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
         {
-            _currentContrast = GetProcAmpProperty("Contrast").value;
+            //_currentContrast = GetProcAmpProperty("Contrast").value;
 
             // Рассчитываем корректировку контраста
-            int contrastAdjustment = CalculateContrastAdjustment(red, green, blue, _currentContrast);
+            int contrastAdjustment = CalculateContrastAdjustment(redR, redG, redB, greenR, greenG, greenB, blueR, blueG, blueB);
 
             // Плавная корректировка контраста
-            _currentContrast = (int)(_currentContrast * 0.8 + contrastAdjustment * 0.2);
+            targetContrast = (int)(targetContrast * 0.8 + contrastAdjustment * 0.2);
 
             // Ограничиваем значение вблизи целевого
-            _currentContrast = Math.Clamp(_currentContrast, _currentContrast - 5, _currentContrast + 5);
-            SetProcAmpProperty("Contrast", _currentContrast);
+            targetContrast = Math.Clamp(targetContrast, targetContrast - 5, targetContrast + 5);
+            SetProcAmpProperty("Contrast", targetContrast);
         }
 
-        private void UpdateWhiteBalance(int red, int green, int blue)
+        //private void UpdateWhiteBalance(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
+        ////private void UpdateWhiteBalance(int red, int green, int blue)
+        //{
+        //    // Рассчитываем среднее значение каналов
+        //    int average = (red + green + blue) / 3;
+
+        //    // Рассчитываем отклонения
+        //    int deltaRed = red - average;
+        //    int deltaBlue = blue - average;
+
+        //    _currentWhiteBalance = GetProcAmpProperty("WhiteBalance").value;
+
+        //    // Рассчитываем коррекцию для баланса белого
+        //    int whiteBalanceCorrection = _currentWhiteBalance + deltaBlue * 10 - deltaRed * 10;
+
+        //    // Ограничиваем диапазон значений
+        //    whiteBalanceCorrection = Math.Clamp(whiteBalanceCorrection, _currentWhiteBalance - 500, _currentWhiteBalance + 500);
+
+        //    // Плавное сглаживание изменений
+        //    _currentWhiteBalance = (int)(_currentWhiteBalance * 0.8 + whiteBalanceCorrection * 0.2);
+
+        //    // Применяем значение
+        //    SetProcAmpProperty("WhiteBalance", _currentWhiteBalance);
+        //}
+
+        private void UpdateWhiteBalance(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
         {
-            // Рассчитываем среднее значение каналов
-            int average = (red + green + blue) / 3;
+            // Рассчитываем средние значения каждого канала
+            int averageRed = (redR + redG + redB) / 3;
+            int averageGreen = (greenR + greenG + greenB) / 3;
+            int averageBlue = (blueR + blueG + blueB) / 3;
+
+            // Рассчитываем общее среднее значение всех каналов
+            int overallAverage = (averageRed + averageGreen + averageBlue) / 3;
 
             // Рассчитываем отклонения
-            int deltaRed = red - average;
-            int deltaBlue = blue - average;
+            int deltaRed = averageRed - overallAverage;
+            int deltaBlue = averageBlue - overallAverage;
 
-            _currentWhiteBalance = GetProcAmpProperty("WhiteBalance").value;
+            //// Получаем текущее значение баланса белого
+            //_currentWhiteBalance = GetProcAmpProperty("WhiteBalance").value;
 
             // Рассчитываем коррекцию для баланса белого
-            int whiteBalanceCorrection = _currentWhiteBalance + deltaBlue * 10 - deltaRed * 10;
+            int whiteBalanceCorrection = targetWhiteBalance + deltaBlue * 10 - deltaRed * 10;
 
             // Ограничиваем диапазон значений
-            whiteBalanceCorrection = Math.Clamp(whiteBalanceCorrection, _currentWhiteBalance - 500, _currentWhiteBalance + 500);
+            whiteBalanceCorrection = Math.Clamp(whiteBalanceCorrection, targetWhiteBalance - 500, targetWhiteBalance + 500);
 
             // Плавное сглаживание изменений
-            _currentWhiteBalance = (int)(_currentWhiteBalance * 0.8 + whiteBalanceCorrection * 0.2);
+            targetWhiteBalance = (int)(targetWhiteBalance * 0.8 + whiteBalanceCorrection * 0.2);
 
-            // Применяем значение
-            SetProcAmpProperty("WhiteBalance", _currentWhiteBalance);
+            // Применяем новое значение
+            SetProcAmpProperty("WhiteBalance", targetWhiteBalance);
+        }
+
+        private void UpdateSaturation(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
+        {
+            // Рассчитываем средние значения каждого канала
+            int averageRed = (redR + redG + redB) / 3;
+            int averageGreen = (greenR + greenG + greenB) / 3;
+            int averageBlue = (blueR + blueG + blueB) / 3;
+
+            // Рассчитываем общую среднюю яркость
+            int overallBrightness = (averageRed + averageGreen + averageBlue) / 3;
+
+            // Рассчитываем насыщенность как разницу между максимальной и минимальной яркостью
+            int minBrightness = Math.Min(averageRed, Math.Min(averageGreen, averageBlue));
+            int maxBrightness = Math.Max(averageRed, Math.Max(averageGreen, averageBlue));
+            int calculatedSaturation = maxBrightness - minBrightness;
+
+            //// Получаем текущее 
+
+            // Рассчитываем целевое значение насыщенности
+            targetSaturation = targetSaturation + (calculatedSaturation - overallBrightness) / 2;
+
+            // Ограничиваем диапазон значений
+            targetSaturation = Math.Clamp(targetSaturation, targetSaturation - 20, targetSaturation + 20);
+
+            // Плавное сглаживание изменений
+            int smoothedSaturation = (int)(targetSaturation * 0.8 + targetSaturation * 0.2);
+
+            // Обновляем текущее значение насыщенности
+            SetProcAmpProperty("Saturation", smoothedSaturation);
         }
 
         private void SetCameraProperty(string property, int value)
@@ -565,7 +637,7 @@ namespace CameraExample
             }
 
             if (pixelCount == 0)
-                return ("Unknown", 0,0,0); // Если нет пикселей для анализа
+                return ("Unknown", 0, 0, 0); // Если нет пикселей для анализа
 
             // Рассчитываем средние значения интенсивностей
             int avgR = totalR / pixelCount;
@@ -586,16 +658,22 @@ namespace CameraExample
 
         #region Static methods (calculations)
 
-        private static int CalculateHueAdjustment(int redMarker, int greenMarker, int blueMarker)
+        //private static int CalculateHueAdjustment(int redMarker, int greenMarker, int blueMarker)
+        private static int CalculateHueAdjustment(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
         {
             const int IdealRed = 255;
             const int IdealGreen = 255;
             const int IdealBlue = 255;
 
+            // Средние значения цветов
+            int avgRed = (redR + redG + redB) / 3;
+            int avgGreen = (greenR + greenG + greenB) / 3;
+            int avgBlue = (blueR + blueG + blueB) / 3;
+
             // Отклонения от идеальных значений
-            int redDelta = IdealRed - redMarker;
-            int greenDelta = IdealGreen - greenMarker;
-            int blueDelta = IdealBlue - blueMarker;
+            int redDelta = IdealRed - avgRed;
+            int greenDelta = IdealGreen - avgGreen;
+            int blueDelta = IdealBlue - avgBlue;
 
             // Расчет коррекции
             int hueAdjustment = (redDelta - greenDelta + blueDelta) / 3;
@@ -604,27 +682,31 @@ namespace CameraExample
             return Math.Clamp(hueAdjustment, -30, 30);
         }
 
-        private int CalculateContrastAdjustment(int redMarker, int greenMarker, int blueMarker, int currentContrast)
+        private int CalculateContrastAdjustment(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
         {
-            int minColor = Math.Min(redMarker, Math.Min(greenMarker, blueMarker));
-            int maxColor = Math.Max(redMarker, Math.Max(greenMarker, blueMarker));
+            // Вычисляем минимальное и максимальное значения цвета
+            int minColor = Math.Min(redR, Math.Min(greenR, blueR));
+            int maxColor = Math.Max(redR, Math.Max(greenR, blueR));
             int brightnessRange = maxColor - minColor;
 
+            //// Получаем текущую яркость
+            //int currentBrightness = GetProcAmpProperty("Brightness").value;
+
             // Определяем целевой контраст
-            int targetContrast = currentContrast;
+            //int targetContrast = currentContrast;
 
-            currentBrightness = GetProcAmpProperty("Brightness").value;
-
-            if (brightnessRange < currentBrightness - 10)
+            if (brightnessRange < targetBrightness - 10)
+            {
                 targetContrast += 10;
-            else if (brightnessRange > currentBrightness + 10)
+            }
+            else if (brightnessRange > targetBrightness + 10)
+            {
                 targetContrast -= 10;
+            }
 
-            // Плавная корректировка
+            // Ограничиваем целевой контраст в пределах допустимых значений
             return Math.Clamp(targetContrast, 0, 100);
         }
-
-
         #endregion
 
         #region Properties
