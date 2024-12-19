@@ -92,15 +92,17 @@ namespace CameraExample
                 Console.WriteLine("Video source has been successfully started");
             }
 
-            // Получаем текущее значение экспозиции
-            ini = new IniFile(iniFilePath);
-            targetExposure = int.Parse(ini.Read("Exposure", "Value")); // Целевое значение из конфигурации
-            targetBrightness = int.Parse(ini.Read("Brightness", "Value")); // Целевое значение из конфигурации
-            targetHue = int.Parse(ini.Read("Hue", "Value")); // Целевое значение из конфигурации
-            targetContrast = int.Parse(ini.Read("Contrast", "Value")); // Целевое значение из конфигурации
-            targetWhiteBalance = int.Parse(ini.Read("WhiteBalance", "Value")); // Целевое значение из конфигурации
-            targetSaturation = int.Parse(ini.Read("Saturation", "Value")); // Целевое значение из конфигурации
-
+            if (File.Exists(iniFilePath) && new FileInfo(iniFilePath).Length != 0)
+            {
+                // Получаем текущее значение экспозиции
+                ini = new IniFile(iniFilePath);
+                targetExposure = int.Parse(ini.Read("Exposure", "Value")); // Целевое значение из конфигурации
+                targetBrightness = int.Parse(ini.Read("Brightness", "Value")); // Целевое значение из конфигурации
+                targetHue = int.Parse(ini.Read("Hue", "Value")); // Целевое значение из конфигурации
+                targetContrast = int.Parse(ini.Read("Contrast", "Value")); // Целевое значение из конфигурации
+                targetWhiteBalance = int.Parse(ini.Read("WhiteBalance", "Value")); // Целевое значение из конфигурации
+                targetSaturation = int.Parse(ini.Read("Saturation", "Value")); // Целевое значение из конфигурации
+            }
             _ = UpdateCameraSettingsAsync();
         }
 
@@ -310,9 +312,9 @@ namespace CameraExample
                         greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
                         blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
 
-                        UpdateContrast(redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
-                        greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
-                        blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
+                    //    UpdateContrast(redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
+                    //    greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
+                    //    blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
                     }
 
 
