@@ -540,9 +540,13 @@ namespace CameraExample
                         continue;
 
                     // Извлекаем значения R, G, B из rgbData
-                    int red = (int)(rgbData[0][y, x] * 255);
+                    //int red = (int)(rgbData[0][y, x] * 255);
+                    //int green = (int)(rgbData[1][y, x] * 255);
+                    //int blue = (int)(rgbData[2][y, x] * 255);
+
+                    int red = (int)(rgbData[2][y, x] * 255);
                     int green = (int)(rgbData[1][y, x] * 255);
-                    int blue = (int)(rgbData[2][y, x] * 255);
+                    int blue = (int)(rgbData[0][y, x] * 255);
 
                     totalR += red;
                     totalG += green;
