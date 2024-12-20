@@ -239,9 +239,9 @@ namespace CameraExample
                         greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
                         blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
 
-                        //UpdateHue(redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
-                        //greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
-                        //blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
+                        UpdateHue(redMarkerData.BrightnessR, redMarkerData.BrightnessG, redMarkerData.BrightnessB,
+                        greenMarkerData.BrightnessR, greenMarkerData.BrightnessG, greenMarkerData.BrightnessB,
+                        blueMarkerData.BrightnessR, blueMarkerData.BrightnessG, blueMarkerData.BrightnessB);
                     }
 
 
@@ -348,20 +348,20 @@ namespace CameraExample
 
         private void UpdateContrast(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
         {
-            int currentContrast = GetProcAmpProperty("Contrast").value;
+            _currentContrast = GetProcAmpProperty("Contrast").value;
 
             // Рассчитываем корректировку контраста
             int contrastAdjustment = CalculateContrastAdjustment(redR, redG, redB, greenR, greenG, greenB, blueR, blueG, blueB);
 
-            Console.WriteLine($"CalculateContrastAdjustment = {contrastAdjustment}  GetProcAmpProperty = {contrastAdjustment}");
+            Console.WriteLine($"CalculateContrastAdjustment = {contrastAdjustment}  GetProcAmpProperty = {_currentContrast}");
 
             // Плавная корректировка контраста
-            int newContrast = (int)(currentContrast * 0.8 + contrastAdjustment * 0.3); // 0.2) !!!!!!!!!!!!;
+            int newContrast = (int)(_currentContrast * 0.8 + contrastAdjustment * 0.3); // 0.2) !!!!!!!!!!!!;
 
             Console.WriteLine($"newContrast = {newContrast}");
             
             // Ограничиваем новое значение в пределах допустимого диапазона
-            newContrast = Math.Clamp(newContrast, currentContrast - 5, currentContrast + 5);
+            newContrast = Math.Clamp(newContrast, _currentContrast - 5, _currentContrast + 5);
             
             Console.WriteLine($"newClamp = {newContrast}");
 
@@ -399,22 +399,20 @@ namespace CameraExample
             SetProcAmpProperty("WhiteBalance", _currentWhiteBalance);
         }
 
-        //private void UpdateHue(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
-        //{
-        //    // Рассчитываем корректировку оттенка (Hue)
-        //    int hueAdjustment = CalculateHueAdjustment(redR, redG, redB, greenR, greenG, greenB, blueR, blueG, blueB);
+        private void UpdateHue(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
+        {
+            // Рассчитываем корректировку оттенка (Hue)
+            int hueAdjustment = CalculateHueAdjustment(redR, redG, redB, greenR, greenG, greenB, blueR, blueG, blueB);
 
-        //    //_currentHue = GetProcAmpProperty("Hue").value;
+            _currentHue = GetProcAmpProperty("Hue").value;
 
+            // Плавное сглаживание изменений оттенка
+            int smoothedHue = (int)(_currentHue * 0.8 + hueAdjustment * 0.2);
 
-
-        //    // Плавное сглаживание изменений оттенка
-        //    int smoothedHue = (int)(targetHue * 0.8 + hueAdjustment * 0.2);
-
-        //    // Применяем значение
-        //    targetHue = Math.Clamp(smoothedHue, targetHue - 10, targetHue + 10);
-        //    SetProcAmpProperty("Hue", targetHue);
-        //}
+            // Применяем значение
+            _currentHue = Math.Clamp(smoothedHue, _currentHue - 10, _currentHue + 10);
+            SetProcAmpProperty("Hue", _currentHue);
+        }
 
         //private void UpdateSaturation(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
         //{
@@ -595,53 +593,28 @@ namespace CameraExample
             return Math.Clamp(targetContrast, 0, 100);
         }
 
-        //private int CalculateContrastAdjustment(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
-        //{
-        //    // Вычисляем минимальное и максимальное значения цветов
-        //    int minColor = Math.Min(Math.Min(redR, greenR), blueR);
-        //    int maxColor = Math.Max(Math.Max(redR, greenR), blueR);
-        //    int brightnessRange = maxColor - minColor;
+        private static int CalculateHueAdjustment(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
+        {
+            const int IdealRed = 255;
+            const int IdealGreen = 255;
+            const int IdealBlue = 255;
 
-        //    // Получаем текущую яркость
-        //    int currentBrightness = GetProcAmpProperty("Brightness").value;
+            // Средние значения цветов
+            int avgRed = (redR + redG + redB) / 3;
+            int avgGreen = (greenR + greenG + greenB) / 3;
+            int avgBlue = (blueR + blueG + blueB) / 3;
 
-        //    // Определяем целевой контраст
-        //    int targetContrast = 50; // Стартовое значение, можно задать как параметр или константу
-        //    if (brightnessRange < currentBrightness - 10)
-        //    {
-        //        targetContrast += 10;
-        //    }
-        //    else if (brightnessRange > currentBrightness + 10)
-        //    {
-        //        targetContrast -= 10;
-        //    }
+            // Отклонения от идеальных значений
+            int redDelta = IdealRed - avgRed;
+            int greenDelta = IdealGreen - avgGreen;
+            int blueDelta = IdealBlue - avgBlue;
 
-        //    // Возвращаем корректировку контраста в допустимых пределах
-        //    return Math.Clamp(targetContrast, 0, 100);
-        //}
+            // Расчет коррекции
+            int hueAdjustment = (redDelta - greenDelta + blueDelta) / 3;
 
-        //private static int CalculateHueAdjustment(int redR, int redG, int redB, int greenR, int greenG, int greenB, int blueR, int blueG, int blueB)
-        //{
-        //    const int IdealRed = 255;
-        //    const int IdealGreen = 255;
-        //    const int IdealBlue = 255;
-
-        //    // Средние значения цветов
-        //    int avgRed = (redR + redG + redB) / 3;
-        //    int avgGreen = (greenR + greenG + greenB) / 3;
-        //    int avgBlue = (blueR + blueG + blueB) / 3;
-
-        //    // Отклонения от идеальных значений
-        //    int redDelta = IdealRed - avgRed;
-        //    int greenDelta = IdealGreen - avgGreen;
-        //    int blueDelta = IdealBlue - avgBlue;
-
-        //    // Расчет коррекции
-        //    int hueAdjustment = (redDelta - greenDelta + blueDelta) / 3;
-
-        //    // Ограничение значений
-        //    return Math.Clamp(hueAdjustment, -30, 30);
-        //}
+            // Ограничение значений
+            return Math.Clamp(hueAdjustment, -30, 30);
+        }
         #endregion
 
         #region Properties
